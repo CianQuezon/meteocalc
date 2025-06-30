@@ -1,3 +1,4 @@
 # Ignores these fodlers and files
 .venv/
 File_Architecture.md
+meteocalc.egg-info/
