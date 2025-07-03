@@ -1470,189 +1470,177 @@ def davies_jones_wet_bulb(temp_c, rh_percent, pressure_hpa,
     Lv = 2.501e6         # Latent heat of vaporization (J/kg)
     epsilon = 0.622      # Molecular weight ratio (water vapor / dry air)
     
-    # Convert to working units (Kelvin and Pascal)
-    T_k = temp_c + KELVIN
-    P_pa = pressure_hpa * 100.0
-    rh_frac = rh_percent / 100.0
+    # FIXED: Process each point individually to avoid closure variable mismatch
+    # This ensures consistent closure variable capture regardless of input type
+    results = []
     
-    # Calculate actual vapor pressure with numerical stability
-    es = vapor_calc.esat(T_k)  # Saturation vapor pressure
-    e = rh_frac * es           # Actual vapor pressure
-    
-    # CRITICAL: Protect against log(negative) for very low RH
-    e_safe = np.clip(e, 1e-3, None)  # Minimum 1e-3 Pa to prevent log(0) or log(negative)
-    
-    # Calculate dewpoint for initial guess using safe vapor pressure
-    ln_ratio = np.log(e_safe / 611.2)
-    Td_k = KELVIN + 243.5 * ln_ratio / (17.67 - ln_ratio)
-    
-    # Psychrometric constant calculation
-    gamma = (cp * P_pa) / (Lv * epsilon)
-    
-    def calculate_improved_initial_guess(T_k, Td_k, rh_frac):
-        """Calculate improved initial guess for wet bulb temperature."""
-        # Use a combination of approaches for better convergence
+    for i in range(len(temp_c)):
+        # Extract single point values (keep as single-element arrays)
+        single_temp_c = temp_c[i:i+1]
+        single_rh_percent = rh_percent[i:i+1]
+        single_pressure_hpa = pressure_hpa[i:i+1]
         
-        # Method 1: Weighted average (original approach)
-        guess1 = 0.8 * Td_k + 0.2 * T_k
+        # Convert to working units (Kelvin and Pascal)
+        T_k = single_temp_c + KELVIN
+        P_pa = single_pressure_hpa * 100.0
+        rh_frac = single_rh_percent / 100.0
         
-        # Method 2: Empirical relationship based on RH
-        rh_factor = np.sqrt(rh_frac)  # Square root relationship works well
-        depression = (T_k - Td_k) * (1 - rh_factor)
-        guess2 = T_k - depression
+        # Calculate actual vapor pressure with numerical stability
+        es = vapor_calc.esat(T_k)  # Saturation vapor pressure
+        e = rh_frac * es           # Actual vapor pressure
         
-        # Method 3: Physical constraint-based approach
-        # Wet bulb should be between dewpoint and dry bulb
-        max_depression = np.minimum(T_k - Td_k, 25.0)  # Limit extreme depressions
-        guess3 = T_k - 0.6 * max_depression
+        # CRITICAL: Protect against log(negative) for very low RH
+        e_safe = np.clip(e, 1e-3, None)  # Minimum 1e-3 Pa to prevent log(0) or log(negative)
         
-        # Combine approaches with weights based on conditions
-        T_c = T_k - 273.15
+        # Calculate dewpoint for initial guess using safe vapor pressure
+        ln_ratio = np.log(e_safe / 611.2)
+        Td_k = KELVIN + 243.5 * ln_ratio / (17.67 - ln_ratio)
         
-        # For normal conditions, use empirical approach
-        normal_mask = (T_c >= -10) & (T_c <= 45) & (rh_frac >= 0.2) & (rh_frac <= 0.98)
+        # Psychrometric constant calculation
+        gamma = (cp * P_pa) / (Lv * epsilon)
         
-        # For extreme conditions, use more conservative approach
-        initial_guess = np.where(normal_mask, guess2, guess1)
-        
-        # Apply final constraints
-        initial_guess = np.minimum(initial_guess, T_k - 0.1)  # Below dry bulb
-        initial_guess = np.maximum(initial_guess, Td_k - 0.1)  # Above dewpoint (with margin)
-        
-        return initial_guess
-
-    # Apply the improved initial guess
-    Tw_k_initial = calculate_improved_initial_guess(T_k, Td_k, rh_frac)
-    
-    # Define the psychrometric equation with bulletproof broadcasting
-    def psychrometric_function(Tw_k):
-        """
-        FIXED: Psychrometric equation with proper vectorization handling
-        es(Tw) - e - γ(T - Tw) = 0
-        """
-        Tw_k = np.asarray(Tw_k, dtype=float)
-        
-        # Ensure minimum dimensionality for consistent handling
-        if Tw_k.ndim == 0:
-            Tw_k = Tw_k.reshape(1)
-        
-        # Calculate saturation vapor pressure at wet bulb temperature
-        es_wb = vapor_calc.esat(Tw_k)
-        
-        # CRITICAL FIX: Handle array size mismatches properly
-        n_points = len(Tw_k)
-        
-        # Use broadcasting instead of manual indexing
-        if n_points == len(e):
-            # Full vectorized calculation
-            return es_wb - e - gamma * (T_k - Tw_k)
-        elif n_points == 1:
-            # Single point evaluation - use scalar values
-            return es_wb - e[0] - gamma[0] * (T_k[0] - Tw_k)
-        else:
-            # Partial array calculation
-            n_use = min(n_points, len(e), len(gamma), len(T_k))
-            return (es_wb[:n_use] - e[:n_use] - 
-                    gamma[:n_use] * (T_k[:n_use] - Tw_k[:n_use]))
-        
-    def psychrometric_derivative(Tw_k):
-        """
-        FIXED: Derivative with proper vectorization handling
-        d/dTw[es(Tw) - e - γ(T - Tw)] = des_dTw + γ
-        """
-        Tw_k = np.asarray(Tw_k, dtype=float)
-        
-        if Tw_k.ndim == 0:
-            Tw_k = Tw_k.reshape(1)
+        def calculate_improved_initial_guess(T_k, Td_k, rh_frac):
+            """Calculate improved initial guess for wet bulb temperature."""
+            # Use a combination of approaches for better convergence
             
-        des_dTw = vapor_calc.esat_derivative(Tw_k)
-        
-        n_points = len(Tw_k)
-        
-        if n_points == len(gamma):
-            return des_dTw + gamma
-        elif n_points == 1:
-            return des_dTw + gamma[0]
-        else:
-            n_use = min(n_points, len(gamma))
-            return des_dTw[:n_use] + gamma[:n_use]
-
-    def psychrometric_second_derivative(Tw_k):
-        """
-        Second derivative of psychrometric equation for Halley's method
-        
-        Parameters
-        ----------
-        Tw_k : np.ndarray
-            Wet bulb temperature in Kelvin
+            # Method 1: Weighted average (original approach)
+            guess1 = 0.8 * Td_k + 0.2 * T_k
             
-        Returns
-        -------
-        np.ndarray
-            Second derivative values
-        """
-        Tw_k = np.asarray(Tw_k)
-        return vapor_calc.esat_second_derivative(Tw_k)
-    
-    # Set default max_iterations if not provided
-    if max_iterations is None:
-        max_iterations = 15 if convergence != 'newton' else 50
-    
-    # Set up bounds for Brent's method - CRITICAL FIX
-    if convergence == 'brent' or convergence == 'hybrid':
-        # Ensure bounds bracket the root: dewpoint < wet_bulb < dry_bulb
-        x_bounds = (Td_k - 0.1, T_k - 0.001)  # Small margins for numerical stability
-    else:
-        x_bounds = None
-    
-    # Solve the psychrometric equation using selected method
-    try:
-        if convergence == 'halley':
-            Tw_k_result, converged = solver.solve(
+            # Method 2: Empirical relationship based on RH
+            rh_factor = np.sqrt(rh_frac)  # Square root relationship works well
+            depression = (T_k - Td_k) * (1 - rh_factor)
+            guess2 = T_k - depression
+            
+            # Method 3: Physical constraint-based approach
+            # Wet bulb should be between dewpoint and dry bulb
+            max_depression = np.minimum(T_k - Td_k, 25.0)  # Limit extreme depressions
+            guess3 = T_k - 0.6 * max_depression
+            
+            # Combine approaches with weights based on conditions
+            T_c = T_k - 273.15
+            
+            # For normal conditions, use empirical approach
+            normal_mask = (T_c >= -10) & (T_c <= 45) & (rh_frac >= 0.2) & (rh_frac <= 0.98)
+            
+            # For extreme conditions, use more conservative approach
+            initial_guess = np.where(normal_mask, guess2, guess1)
+            
+            # Apply final constraints
+            initial_guess = np.minimum(initial_guess, T_k - 0.1)  # Below dry bulb
+            initial_guess = np.maximum(initial_guess, Td_k - 0.1)  # Above dewpoint (with margin)
+            
+            return initial_guess
+
+        # Apply the improved initial guess
+        Tw_k_initial = calculate_improved_initial_guess(T_k, Td_k, rh_frac)
+        
+        # Define the psychrometric equation with consistent single-point closure variables
+        def psychrometric_function(Tw_k):
+            """
+            FIXED: Psychrometric equation with single-point closure variables
+            es(Tw) - e - γ(T - Tw) = 0
+            
+            Now e, gamma, T_k are always single-element arrays for consistent behavior.
+            """
+            Tw_k = np.asarray(Tw_k, dtype=float)
+            
+            # Ensure minimum dimensionality for consistent handling
+            if Tw_k.ndim == 0:
+                Tw_k = Tw_k.reshape(1)
+            
+            # Calculate saturation vapor pressure at wet bulb temperature
+            es_wb = vapor_calc.esat(Tw_k)
+            
+            # Simple calculation since all closure variables are single-element arrays
+            result = es_wb - e[0] - gamma[0] * (T_k[0] - Tw_k)
+            return result
+            
+        def psychrometric_derivative(Tw_k):
+            """
+            FIXED: Derivative with single-point closure variables
+            d/dTw[es(Tw) - e - γ(T - Tw)] = des_dTw + γ
+            
+            Now gamma is always a single-element array for consistent behavior.
+            """
+            Tw_k = np.asarray(Tw_k, dtype=float)
+            
+            if Tw_k.ndim == 0:
+                Tw_k = Tw_k.reshape(1)
+                
+            des_dTw = vapor_calc.esat_derivative(Tw_k)
+            
+            # Simple calculation since gamma is single-element array
+            result = des_dTw + gamma[0]
+            return result
+
+        def psychrometric_second_derivative(Tw_k):
+            """Second derivative of psychrometric equation for Halley's method"""
+            Tw_k = np.asarray(Tw_k)
+            return vapor_calc.esat_second_derivative(Tw_k)
+        
+        # Set default max_iterations if not provided
+        if max_iterations is None:
+            max_iterations = 15 if convergence != 'newton' else 50
+        
+        # Set up bounds for Brent's method
+        if convergence == 'brent' or convergence == 'hybrid':
+            # Ensure bounds bracket the root: dewpoint < wet_bulb < dry_bulb
+            x_bounds = (Td_k - 0.1, T_k - 0.001)  # Small margins for numerical stability
+        else:
+            x_bounds = None
+        
+        # Solve the psychrometric equation using selected method
+        try:
+            if convergence == 'halley':
+                Tw_k_result, converged = solver.solve(
+                    psychrometric_function,
+                    psychrometric_derivative,
+                    Tw_k_initial,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                    d2f_func=psychrometric_second_derivative
+                )
+            else:
+                Tw_k_result, converged = solver.solve(
+                    psychrometric_function,
+                    psychrometric_derivative,
+                    Tw_k_initial,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                    x_bounds=x_bounds
+                )
+        except Exception as e:
+            # Final fallback to Newton-Raphson
+            warnings.warn(f"Convergence failed: {e}. Using fallback Newton-Raphson method.")
+            fallback_solver = NewtonRaphsonSolver()
+            Tw_k_result, converged = fallback_solver.solve(
                 psychrometric_function,
                 psychrometric_derivative,
                 Tw_k_initial,
                 tolerance=tolerance,
-                max_iterations=max_iterations,
-                d2f_func=psychrometric_second_derivative
+                max_iterations=max_iterations
             )
-        else:
-            Tw_k_result, converged = solver.solve(
-                psychrometric_function,
-                psychrometric_derivative,
-                Tw_k_initial,
-                tolerance=tolerance,
-                max_iterations=max_iterations,
-                x_bounds=x_bounds
-            )
-    except Exception as e:
-        # Final fallback to Newton-Raphson
-        warnings.warn(f"Convergence failed: {e}. Using fallback Newton-Raphson method.")
-        fallback_solver = NewtonRaphsonSolver()
-        Tw_k_result, converged = fallback_solver.solve(
-            psychrometric_function,
-            psychrometric_derivative,
-            Tw_k_initial,
-            tolerance=tolerance,
-            max_iterations=max_iterations
-        )
+        
+        # Convert result to Celsius
+        result = Tw_k_result - KELVIN
+        
+        # Apply physical constraints to ensure realistic results
+        result = np.minimum(result, single_temp_c - 0.001)  # Wet bulb ≤ dry bulb
+        result = np.maximum(result, single_temp_c - 50.0)   # Reasonable lower bound
+        
+        # Issue warnings for non-converged points
+        if not np.all(converged):
+            warnings.warn(f"Point {i+1} failed to converge with {vapor}+{convergence}")
+        
+        results.append(result[0])  # Extract scalar result
     
-    # Convert result to Celsius
-    result = Tw_k_result - KELVIN
-    
-    # Apply physical constraints to ensure realistic results
-    result = np.minimum(result, temp_c - 0.001)  # Wet bulb ≤ dry bulb
-    result = np.maximum(result, temp_c - 50.0)   # Reasonable lower bound
-    
-    # Issue warnings for non-converged points
-    if not np.all(converged):
-        n_failed = np.sum(~converged)
-        warnings.warn(f"{n_failed} points failed to converge with {vapor}+{convergence}")
+    # Convert results to array
+    result_array = np.array(results)
     
     # Return scalar if input was scalar, otherwise return array
     if scalar_input:
-        return float(result[0])
-    return result
+        return float(result_array[0])
+    return result_array
 
 
 # =============================================================================
