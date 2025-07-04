@@ -56,6 +56,13 @@ def pytest_configure(config) -> None:
     )
 
 
+    # ADD THESE DEWPOINT MARKERS:
+    config.addinivalue_line("markers", "external: tests requiring external libraries (PsychroLib, CoolProp, MetPy)")
+    config.addinivalue_line("markers", "benchmark: performance benchmark tests using pytest-benchmark")
+    config.addinivalue_line("markers", "ice_phase: tests specifically for ice phase enhancement functionality")
+    config.addinivalue_line("markers", "brent_solver: tests for custom Brent solver implementation")
+    config.addinivalue_line("markers", "dewpoint: tests for enhanced dewpoint calculator functionality")
+
 def pytest_collection_modifyitems(config, items) -> None:
     """Modify test collection to add markers based on test names.
     
