@@ -618,7 +618,57 @@ class NewtonRaphsonSolver(ConvergenceBase):
     """
     
     def solve(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, **kwargs):
-        """Solve using Newton-Raphson method with vectorization."""
+            """Solve using pure scalar Newton-Raphson method for single points."""
+            
+            # Convert to scalar values
+            if hasattr(x0, '__len__') and len(x0) == 1:
+                x = float(x0[0])
+            else:
+                x = float(x0)
+            
+            converged = False
+            
+            for iteration in range(max_iterations):
+                # Evaluate function and derivative at current point
+                try:
+                    # Pass scalar value wrapped in single-element array for consistency
+                    x_array = np.array([x])
+                    f_val = f_func(x_array)
+                    df_val = df_func(x_array)
+                    
+                    # Extract scalar results
+                    if hasattr(f_val, '__len__'):
+                        f_val = float(f_val[0])
+                    else:
+                        f_val = float(f_val)
+                        
+                    if hasattr(df_val, '__len__'):
+                        df_val = float(df_val[0])
+                    else:
+                        df_val = float(df_val)
+                    
+                    # Check convergence
+                    if abs(f_val) < tolerance:
+                        converged = True
+                        break
+                    
+                    # Check for valid derivative (avoid division by zero)
+                    if abs(df_val) <= 1e-12:
+                        break
+                    
+                    # Newton-Raphson update step
+                    delta_x = f_val / df_val
+                    x -= delta_x
+                    
+                except Exception as e:
+                    warnings.warn(f"Scalar Newton solver error: {e}")
+                    break
+            
+            # Return results in same format as vectorized version
+            return np.array([x]), np.array([converged])
+
+    def solve_vectorized(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, **kwargs):
+        """Solve using fully vectorized Newton-Raphson method."""
         x = x0.copy()  # Working copy of initial guess
         converged = np.zeros_like(x, dtype=bool)  # Convergence status array
         
@@ -626,53 +676,30 @@ class NewtonRaphsonSolver(ConvergenceBase):
             # Early termination if all points have converged
             if np.all(converged):
                 break
-                
-            mask = ~converged  # Mask for non-converged points
-            if not np.any(mask):
-                break
-            
-            # Set active indices for function broadcasting
-            if hasattr(f_func, '__self__') or hasattr(f_func, '_active_indices'):
-                f_func._active_indices = mask
-                df_func._active_indices = mask
             
             try:
-                # Extract non-converged points for processing
-                mask_indices = np.where(mask)[0]
+                # Always pass full arrays to functions
+                f_val = f_func(x)
+                df_val = df_func(x)
                 
-                if len(mask_indices) == 0:
-                    continue
-                    
-                x_active = x[mask_indices]
-                f_val = f_func(x_active)
-                df_val = df_func(x_active)
+                # Ensure arrays
+                f_val = np.asarray(f_val)
+                df_val = np.asarray(df_val)
                 
-                # Ensure arrays and handle potential size mismatches
-                f_val = np.atleast_1d(np.asarray(f_val))
-                df_val = np.atleast_1d(np.asarray(df_val))
+                # Check convergence for all points
+                newly_converged = (np.abs(f_val) < tolerance) & (~converged)
+                converged = converged | newly_converged
                 
-                # Process each point individually to avoid broadcasting issues
-                for i, global_idx in enumerate(mask_indices):
-                    # Check array bounds
-                    if i >= len(f_val) or i >= len(df_val):
-                        continue
-                        
-                    # Check convergence criterion
-                    if np.abs(f_val[i]) < tolerance:
-                        converged[global_idx] = True
-                        continue
-                        
-                    # Check for valid derivative (avoid division by zero)
-                    if np.abs(df_val[i]) <= 1e-12:
-                        continue
-                        
-                    # Newton-Raphson update step
-                    delta_x = f_val[i] / df_val[i]
-                    x[global_idx] -= delta_x
-
+                # Create mask for points that still need updating
+                needs_update = (~converged) & (np.abs(df_val) > 1e-12)
+                
+                # Newton-Raphson update only for points that need it
+                if np.any(needs_update):
+                    delta_x = np.where(needs_update, f_val / df_val, 0.0)
+                    x = x - delta_x
+                
             except Exception as e:
-                # Fallback for broadcasting issues
-                warnings.warn(f"Broadcasting error in Newton solver: {e}")
+                warnings.warn(f"Vectorized Newton solver error: {e}")
                 break
         
         return x, converged
@@ -707,53 +734,35 @@ class BrentSolver(ConvergenceBase):
     """
     
     def solve(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, 
-              x_bounds=None, **kwargs):
-        """Solve using Brent's method with automatic bracketing."""
-        
-        x = x0.copy()  # Working copy of initial guess
-        converged = np.zeros_like(x, dtype=bool)  # Convergence status array
-        
-        # Process each point individually for Brent's method
-        for i in range(len(x)):
+                x_bounds=None, **kwargs):
+            """Solve using Brent's method with automatic bracketing - pure scalar implementation."""
+            
+            # Convert to scalar values
+            x0_scalar = float(x0)
+            
+            # Set up bounds
+            if x_bounds is not None:
+                a, b = float(x_bounds[0]), float(x_bounds[1])
+            else:
+                # For wet bulb temperature, use more appropriate bounds
+                # Wet bulb is always <= dry bulb temperature
+                initial_guess = x0_scalar
+                
+                # Try bounds based on typical wet bulb ranges
+                # Lower bound: significantly below initial guess
+                a = initial_guess - 20.0
+                # Upper bound: at or slightly above initial guess (dry bulb limit)
+                b = initial_guess + 2.0
+            
             try:
-                # Create scalar function for this specific point
-                def scalar_f(xi):
-                    # Create single-element array for function evaluation
-                    xi_arr = np.array([xi])
-                    
-                    # Temporarily modify the input array to evaluate just this point
-                    temp_x = x0.copy()
-                    temp_x[i] = xi
-                    
-                    # Evaluate function and extract result for this point
-                    result = f_func(temp_x)
-                    if hasattr(result, '__len__') and len(result) > 0:
-                        return float(result[i])
-                    else:
-                        return float(result)
-                
-                # Set up bounds for this point
-                if x_bounds is not None:
-                    a, b = x_bounds[0][i], x_bounds[1][i]
-                else:
-                    # For wet bulb temperature, use more appropriate bounds
-                    # Wet bulb is always <= dry bulb temperature
-                    initial_guess = x0[i]
-                    
-                    # Try bounds based on typical wet bulb ranges
-                    # Lower bound: significantly below initial guess
-                    a = initial_guess - 20.0
-                    # Upper bound: at or slightly above initial guess (dry bulb limit)
-                    b = initial_guess + 2.0
-                
                 # Check if root is bracketed
-                fa = scalar_f(a)
-                fb = scalar_f(b)
+                fa = float(f_func(a))
+                fb = float(f_func(b))
                 
                 # If not bracketed, try to find better bounds
                 if fa * fb > 0:
                     # Try expanding bounds systematically with better strategy
-                    initial_guess = x0[i]
+                    initial_guess = x0_scalar
                     
                     # Try different bracketing strategies
                     bracket_attempts = [
@@ -767,8 +776,8 @@ class BrentSolver(ConvergenceBase):
                     bracketed = False
                     for a_new, b_new in bracket_attempts:
                         try:
-                            fa_new = scalar_f(a_new)
-                            fb_new = scalar_f(b_new)
+                            fa_new = float(f_func(a_new))
+                            fb_new = float(f_func(b_new))
                             if fa_new * fb_new < 0:
                                 a, b, fa, fb = a_new, b_new, fa_new, fb_new
                                 bracketed = True
@@ -778,26 +787,16 @@ class BrentSolver(ConvergenceBase):
                     
                     if not bracketed:
                         # Fall back to Newton-Raphson with better implementation
-                        xi = x0[i]
-                        
-                        def scalar_df(xi_val):
-                            temp_x = x0.copy()
-                            temp_x[i] = xi_val
-                            result = df_func(temp_x)
-                            if hasattr(result, '__len__') and len(result) > 0:
-                                return float(result[i])
-                            else:
-                                return float(result)
+                        xi = x0_scalar
                         
                         # Newton-Raphson with better convergence handling
                         for nr_iter in range(max_iterations):
-                            f_val = scalar_f(xi)
+                            f_val = float(f_func(xi))
                             if abs(f_val) < tolerance:
-                                converged[i] = True
-                                break
+                                return xi, True
                             
                             try:
-                                df_val = scalar_df(xi)
+                                df_val = float(df_func(xi))
                                 if abs(df_val) > 1e-12:
                                     # Limit step size for stability
                                     step = f_val / df_val
@@ -810,8 +809,7 @@ class BrentSolver(ConvergenceBase):
                             except:
                                 break
                         
-                        x[i] = xi
-                        continue
+                        return xi, False
                 
                 # Brent's method implementation with better numerical stability
                 if abs(fa) < abs(fb):
@@ -826,9 +824,7 @@ class BrentSolver(ConvergenceBase):
                 for iteration in range(max_iterations):
                     # Check convergence criteria
                     if abs(fb) < tolerance or abs(b - a) < tolerance:
-                        x[i] = b
-                        converged[i] = True
-                        break
+                        return b, True
                     
                     # Choose method: inverse quadratic interpolation or secant
                     try:
@@ -847,8 +843,8 @@ class BrentSolver(ConvergenceBase):
                                     s = (a + b) / 2
                             else:
                                 s = (a * fb * fc / denom1 + 
-                                     b * fa * fc / denom2 + 
-                                     c * fa * fb / denom3)
+                                    b * fa * fc / denom2 + 
+                                    c * fa * fb / denom3)
                         else:
                             # Secant method
                             if abs(fb - fa) > 1e-14:
@@ -874,11 +870,11 @@ class BrentSolver(ConvergenceBase):
                         mflag = False
                     
                     try:
-                        fs = scalar_f(s)
+                        fs = float(f_func(s))
                     except:
                         # Function evaluation failed, use bisection
                         s = (a + b) / 2
-                        fs = scalar_f(s)
+                        fs = float(f_func(s))
                     
                     # Update for next iteration
                     c = b
@@ -896,63 +892,32 @@ class BrentSolver(ConvergenceBase):
                         a, b = b, a
                         fa, fb = fb, fa
                 
-                # If we exit the loop without convergence, mark as unconverged
-                if not converged[i]:
-                    x[i] = b
-                    # Try one more Newton-Raphson step for refinement
-                    try:
-                        def scalar_df(xi_val):
-                            temp_x = x0.copy()
-                            temp_x[i] = xi_val
-                            result = df_func(temp_x)
-                            if hasattr(result, '__len__') and len(result) > 0:
-                                return float(result[i])
-                            else:
-                                return float(result)
-                        
-                        f_val = scalar_f(x[i])
-                        if abs(f_val) < tolerance:
-                            converged[i] = True
-                        else:
-                            df_val = scalar_df(x[i])
-                            if abs(df_val) > 1e-12:
-                                x[i] -= f_val / df_val
-                                # Check if this improved convergence
-                                if abs(scalar_f(x[i])) < tolerance:
-                                    converged[i] = True
-                    except:
-                        pass
-                    
-            except Exception as e:
-                # If everything fails, keep original guess
-                x[i] = x0[i]
-                # Try a simple Newton-Raphson as last resort
+                # If we exit the loop without convergence, try one more Newton-Raphson step
                 try:
-                    def scalar_f_simple(xi_val):
-                        temp_x = x0.copy()
-                        temp_x[i] = xi_val
-                        result = f_func(temp_x)
-                        if hasattr(result, '__len__') and len(result) > 0:
-                            return float(result[i])
-                        else:
-                            return float(result)
-                    
-                    def scalar_df_simple(xi_val):
-                        temp_x = x0.copy()
-                        temp_x[i] = xi_val
-                        result = df_func(temp_x)
-                        if hasattr(result, '__len__') and len(result) > 0:
-                            return float(result[i])
-                        else:
-                            return float(result)
-                    
-                    xi = x0[i]
+                    f_val = float(f_func(b))
+                    if abs(f_val) < tolerance:
+                        return b, True
+                    else:
+                        df_val = float(df_func(b))
+                        if abs(df_val) > 1e-12:
+                            refined_x = b - f_val / df_val
+                            # Check if this improved convergence
+                            if abs(float(f_func(refined_x))) < tolerance:
+                                return refined_x, True
+                except:
+                    pass
+                
+                return b, False
+                        
+            except Exception as e:
+                # If everything fails, try a simple Newton-Raphson as last resort
+                try:
+                    xi = x0_scalar
                     for _ in range(20):  # More iterations for difficult cases
-                        f_val = scalar_f_simple(xi)
+                        f_val = float(f_func(xi))
                         if abs(f_val) < tolerance:
-                            converged[i] = True
-                            break
-                        df_val = scalar_df_simple(xi)
+                            return xi, True
+                        df_val = float(df_func(xi))
                         if abs(df_val) > 1e-12:
                             step = f_val / df_val
                             # Limit step size
@@ -961,13 +926,230 @@ class BrentSolver(ConvergenceBase):
                             xi -= step
                         else:
                             break
-                    x[i] = xi
+                    return xi, False
                 except:
-                    # Absolute last resort - keep original
-                    pass
+                    # Absolute last resort - return original guess
+                    return x0_scalar, False
+    
+    def solve_vectorized(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, 
+                        x_bounds=None, **kwargs):
+        """Solve using properly implemented vectorized Brent method."""
         
-        return x, converged
-
+        # Convert inputs to arrays
+        x0 = np.asarray(x0, dtype=float)
+        
+        # Handle scalar input
+        if x0.ndim == 0:
+            x0 = x0.reshape(1)
+            scalar_input = True
+        else:
+            scalar_input = False
+        
+        n_points = len(x0)
+        
+        # Initialize bounds with proper root bracketing for wet bulb problem
+        if x_bounds is not None:
+            a = x_bounds[0].copy()
+            b = x_bounds[1].copy()
+        else:
+            # For wet bulb, use conservative bounds that should bracket the root
+            a = x0 - 15.0  # Well below initial guess
+            b = x0 + 1.0   # Slightly above (wet bulb <= dry bulb)
+        
+        # Ensure arrays
+        a = np.asarray(a, dtype=float)
+        b = np.asarray(b, dtype=float)
+        
+        if a.ndim == 0:
+            a = np.full_like(x0, a)
+        if b.ndim == 0:
+            b = np.full_like(x0, b)
+        
+        # Initialize convergence tracking
+        converged = np.zeros(n_points, dtype=bool)
+        result = x0.copy()
+        
+        # Check initial bracket and fix if needed
+        fa = f_func(a)
+        fb = f_func(b)
+        fa = np.asarray(fa, dtype=float)
+        fb = np.asarray(fb, dtype=float)
+        
+        # For points where root is not bracketed, try to fix bounds
+        not_bracketed = (fa * fb > 0)
+        
+        if np.any(not_bracketed):
+            # Try to expand bounds for non-bracketed points
+            for expand_factor in [2.0, 5.0, 10.0, 20.0]:
+                still_not_bracketed = not_bracketed & ~converged
+                if not np.any(still_not_bracketed):
+                    break
+                    
+                # Expand bounds
+                a_new = np.where(still_not_bracketed, x0 - expand_factor * 5.0, a)
+                b_new = np.where(still_not_bracketed, x0 + expand_factor * 1.0, b)
+                
+                fa_new = f_func(a_new)
+                fb_new = f_func(b_new)
+                fa_new = np.asarray(fa_new, dtype=float)
+                fb_new = np.asarray(fb_new, dtype=float)
+                
+                # Update bounds where bracketing is achieved
+                newly_bracketed = still_not_bracketed & (fa_new * fb_new < 0)
+                a = np.where(newly_bracketed, a_new, a)
+                b = np.where(newly_bracketed, b_new, b)
+                fa = np.where(newly_bracketed, fa_new, fa)
+                fb = np.where(newly_bracketed, fb_new, fb)
+                not_bracketed = not_bracketed & ~newly_bracketed
+        
+        # For points still not bracketed, fall back to Newton-Raphson
+        still_not_bracketed = not_bracketed & ~converged
+        if np.any(still_not_bracketed):
+            # Simple vectorized Newton-Raphson for non-bracketed points
+            x_newton = x0.copy()
+            for newton_iter in range(20):
+                f_newton = f_func(x_newton)
+                f_newton = np.asarray(f_newton, dtype=float)
+                
+                # Check convergence for Newton points
+                newton_converged = still_not_bracketed & (np.abs(f_newton) < tolerance)
+                converged = converged | newton_converged
+                still_not_bracketed = still_not_bracketed & ~newton_converged
+                
+                if not np.any(still_not_bracketed):
+                    break
+                
+                # Newton step
+                df_newton = df_func(x_newton)
+                df_newton = np.asarray(df_newton, dtype=float)
+                
+                # Update Newton points
+                valid_derivative = still_not_bracketed & (np.abs(df_newton) > 1e-12)
+                step = np.where(valid_derivative, f_newton / df_newton, 0.0)
+                # Limit step size for stability
+                step = np.where(np.abs(step) > 5.0, 5.0 * np.sign(step), step)
+                x_newton = np.where(still_not_bracketed, x_newton - step, x_newton)
+            
+            # Update results for Newton-converged points
+            result = np.where(converged & not_bracketed, x_newton, result)
+        
+        # Now run Brent's method for bracketed points
+        needs_brent = ~converged
+        
+        if np.any(needs_brent):
+            # Ensure |f(a)| >= |f(b)| for Brent points
+            swap_mask = needs_brent & (np.abs(fa) < np.abs(fb))
+            a_temp = a.copy()
+            fa_temp = fa.copy()
+            a = np.where(swap_mask, b, a)
+            b = np.where(swap_mask, a_temp, b)
+            fa = np.where(swap_mask, fb, fa)
+            fb = np.where(swap_mask, fa_temp, fb)
+            
+            # Initialize Brent variables
+            c = a.copy()
+            fc = fa.copy()
+            mflag = np.ones(n_points, dtype=bool)
+            s = b.copy()
+            
+            for iteration in range(max_iterations):
+                # Check convergence
+                brent_converged = needs_brent & ((np.abs(fb) < tolerance) | (np.abs(b - a) < tolerance))
+                converged = converged | brent_converged
+                needs_brent = needs_brent & ~brent_converged
+                
+                if not np.any(needs_brent):
+                    break
+                
+                # Choose interpolation method
+                use_inverse_quad = needs_brent & (fa != fc) & (fb != fc)
+                
+                # Inverse quadratic interpolation
+                if np.any(use_inverse_quad):
+                    # Calculate denominators with numerical safety
+                    denom1 = (fa - fb) * (fa - fc)
+                    denom2 = (fb - fa) * (fb - fc)
+                    denom3 = (fc - fa) * (fc - fb)
+                    
+                    # Check for numerical issues
+                    safe_denom = (np.abs(denom1) > 1e-14) & (np.abs(denom2) > 1e-14) & (np.abs(denom3) > 1e-14)
+                    use_inverse_quad = use_inverse_quad & safe_denom
+                    
+                    if np.any(use_inverse_quad):
+                        # Protect against division by zero
+                        denom1_safe = np.where(np.abs(denom1) > 1e-14, denom1, 1.0)
+                        denom2_safe = np.where(np.abs(denom2) > 1e-14, denom2, 1.0)
+                        denom3_safe = np.where(np.abs(denom3) > 1e-14, denom3, 1.0)
+                        
+                        s_quad = (a * fb * fc / denom1_safe + 
+                                 b * fa * fc / denom2_safe + 
+                                 c * fa * fb / denom3_safe)
+                        
+                        s = np.where(use_inverse_quad, s_quad, s)
+                
+                # Secant method for remaining points
+                use_secant = needs_brent & ~use_inverse_quad
+                if np.any(use_secant):
+                    safe_secant = use_secant & (np.abs(fb - fa) > 1e-14)
+                    
+                    s_secant = b - fb * (b - a) / np.where(np.abs(fb - fa) > 1e-14, fb - fa, 1.0)
+                    s_bisect = 0.5 * (a + b)
+                    s = np.where(safe_secant, s_secant, 
+                               np.where(use_secant, s_bisect, s))
+                
+                # Check conditions for bisection fallback
+                tmp2 = (3 * a + b) / 4
+                condition1 = needs_brent & ~((s > np.minimum(tmp2, b)) & (s < np.maximum(tmp2, b)))
+                condition2 = needs_brent & mflag & (np.abs(s - b) >= np.abs(b - c) / 2)
+                condition3 = needs_brent & ~mflag & (np.abs(s - b) >= np.abs(c - a) / 2)
+                condition4 = needs_brent & mflag & (np.abs(b - c) < tolerance)
+                condition5 = needs_brent & ~mflag & (np.abs(c - a) < tolerance)
+                
+                use_bisection = condition1 | condition2 | condition3 | condition4 | condition5
+                s = np.where(use_bisection, 0.5 * (a + b), s)
+                mflag = np.where(needs_brent, use_bisection, mflag)
+                
+                # Function evaluation at s
+                fs = f_func(s)
+                fs = np.asarray(fs, dtype=float)
+                
+                # Update for next iteration
+                c = np.where(needs_brent, b, c)
+                fc = np.where(needs_brent, fb, fc)
+                
+                # Update brackets
+                update_b = needs_brent & (fa * fs < 0)
+                update_a = needs_brent & ~update_b
+                
+                b = np.where(update_b, s, b)
+                fb = np.where(update_b, fs, fb)
+                a = np.where(update_a, s, a)
+                fa = np.where(update_a, fs, fa)
+                
+                # Ensure |f(a)| >= |f(b)|
+                swap_mask = needs_brent & (np.abs(fa) < np.abs(fb))
+                a_temp = a.copy()
+                fa_temp = fa.copy()
+                a = np.where(swap_mask, b, a)
+                b = np.where(swap_mask, a_temp, b)
+                fa = np.where(swap_mask, fb, fa)
+                fb = np.where(swap_mask, fa_temp, fb)
+            
+            # Update results for Brent points
+            result = np.where(needs_brent | brent_converged, b, result)
+        
+        # Final convergence check
+        final_f = f_func(result)
+        final_f = np.asarray(final_f, dtype=float)
+        final_converged = np.abs(final_f) < tolerance
+        converged = converged | final_converged
+        
+        # Return scalar if input was scalar
+        if scalar_input:
+            return float(result[0]), bool(converged[0])
+        else:
+            return result, converged
+        
 class HalleySolver(ConvergenceBase):
     """
     Halley's method for cubic convergence.
@@ -995,58 +1177,118 @@ class HalleySolver(ConvergenceBase):
     """
     
     def solve(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, 
-              d2f_func=None, **kwargs):
-        """Solve using Halley's method with cubic convergence."""
+                d2f_func=None, **kwargs):
+            """Solve using Halley's method with cubic convergence - pure scalar implementation."""
+            if d2f_func is None:
+                # Fallback to Newton-Raphson if second derivative not provided
+                return NewtonRaphsonSolver().solve(f_func, df_func, x0, tolerance, max_iterations)
+            
+            # Convert to scalar
+            x = float(x0)
+            
+            for iteration in range(max_iterations):
+                # Evaluate function and derivatives
+                f_val = float(f_func(x))
+                
+                # Check convergence
+                if abs(f_val) < tolerance:
+                    return x, True
+                
+                df_val = float(df_func(x))
+                d2f_val = float(d2f_func(x))
+                
+                # Halley's formula: x_new = x - 2*f*f' / (2*(f')^2 - f*f'')
+                denominator = 2 * df_val**2 - f_val * d2f_val
+                
+                # Check for denominator singularity
+                if abs(denominator) <= 1e-12:
+                    # Denominator too small, method fails
+                    return x, False
+                
+                # Apply Halley's update
+                delta_x = (2 * f_val * df_val) / denominator
+                x -= delta_x
+            
+            # If we exit without convergence, check final value
+            final_f = float(f_func(x))
+            converged = abs(final_f) < tolerance
+            
+            return x, converged
+
+    def solve_vectorized(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, 
+                        d2f_func=None, **kwargs):
+        """Solve using fully vectorized Halley's method."""
         if d2f_func is None:
-            # Fallback to Newton-Raphson if second derivative not provided
-            return NewtonRaphsonSolver().solve(f_func, df_func, x0, tolerance, max_iterations)
+            # Fallback to vectorized Newton-Raphson
+            return NewtonRaphsonSolver().solve_vectorized(f_func, df_func, x0, tolerance, max_iterations)
         
-        x = x0.copy()  # Working copy of initial guess
-        converged = np.zeros_like(x, dtype=bool)  # Convergence status array
+        x = x0.copy()
+        converged = np.zeros_like(x, dtype=bool)
         
         for iteration in range(max_iterations):
-            # Early termination if all points have converged
             if np.all(converged):
                 break
+            
+            try:
+                # Always pass full arrays to functions
+                f_val = f_func(x)
+                df_val = df_func(x)
+                d2f_val = d2f_func(x)
                 
-            mask = ~converged  # Mask for non-converged points
-            if not np.any(mask):
+                # Ensure arrays
+                f_val = np.asarray(f_val)
+                df_val = np.asarray(df_val)
+                d2f_val = np.asarray(d2f_val)
+                
+                # Check convergence
+                newly_converged = (np.abs(f_val) < tolerance) & (~converged)
+                converged = converged | newly_converged
+                
+                # Halley's formula: x_new = x - 2*f*f' / (2*(f')^2 - f*f'')
+                denominator = 2 * df_val**2 - f_val * d2f_val
+                
+                # Create mask for valid updates
+                needs_update = (~converged) & (np.abs(denominator) > 1e-12)
+                
+                if np.any(needs_update):
+                    numerator = 2 * f_val * df_val
+                    delta_x = np.where(needs_update, numerator / denominator, 0.0)
+                    x = x - delta_x
+                
+            except Exception as e:
+                warnings.warn(f"Vectorized Halley solver error: {e}")
                 break
-                
-            # Evaluate function and derivatives at non-converged points
-            f_val = f_func(x[mask])
-            df_val = df_func(x[mask])
-            d2f_val = d2f_func(x[mask])
-            
-            # Check convergence for current iteration
-            local_converged = np.abs(f_val) < tolerance
-            converged[mask] = local_converged
-            
-            # Halley's formula: x_new = x - 2*f*f' / (2*(f')^2 - f*f'')
-            still_iterating = mask.copy()
-            still_iterating[mask] = ~local_converged
-            
-            if not np.any(still_iterating):
-                continue
-                
-            # Extract values for points that still need updating
-            f_update = f_val[~local_converged]
-            df_update = df_val[~local_converged]
-            d2f_update = d2f_val[~local_converged]
-            
-            # Calculate denominator and check for singularities
-            denominator = 2 * df_update**2 - f_update * d2f_update
-            valid_denominator = np.abs(denominator) > 1e-12
-            
-            if np.any(valid_denominator):
-                update_indices = np.where(still_iterating)[0][valid_denominator]
-                delta_x = (2 * f_update[valid_denominator] * df_update[valid_denominator] / 
-                          denominator[valid_denominator])
-                x[update_indices] -= delta_x
         
         return x, converged
 
 
+class SecantSolver(ConvergenceBase):
+    """
+    Secant method for derivative-free convergence.
+    
+    Implements the secant method, which approximates derivatives using
+    finite differences. This method provides good convergence without
+    requiring analytical derivatives.
+    
+    Notes
+    -----
+    Algorithm: x_{n+1} = x_n - f(x_n) * (x_n - x_{n-1}) / (f(x_n) - f(x_{n-1}))
+    
+    Advantages:
+    - No derivatives required
+    - Superlinear convergence
+    - Good balance of speed and robustness
+    
+    Disadvantages:
+    - Slower than Newton-Raphson
+    - Requires two initial points
+    - May fail for noisy functions
+    
+    The implementation includes automatic generation of the second
+    initial point and handles cases where consecutive function
+    values are equal.
+    """
+    
 class SecantSolver(ConvergenceBase):
     """
     Secant method for derivative-free convergence.
@@ -1121,6 +1363,50 @@ class SecantSolver(ConvergenceBase):
                 # Update x_prev before updating x
                 x_prev[update_indices] = x[update_indices]
                 x[update_indices] -= delta_x
+        
+        return x, converged
+
+    def solve_vectorized(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50, **kwargs):
+        """Solve using fully vectorized secant method."""
+        x = x0.copy()
+        x_prev = x0 - 0.1  # Generate second initial point
+        converged = np.zeros_like(x, dtype=bool)
+        
+        for iteration in range(max_iterations):
+            if np.all(converged):
+                break
+            
+            try:
+                # Always pass full arrays to functions
+                f_val = f_func(x)
+                f_prev = f_func(x_prev)
+                
+                # Ensure arrays
+                f_val = np.asarray(f_val)
+                f_prev = np.asarray(f_prev)
+                
+                # Check convergence
+                newly_converged = (np.abs(f_val) < tolerance) & (~converged)
+                converged = converged | newly_converged
+                
+                # Secant formula
+                denominator = f_val - f_prev
+                
+                # Create mask for valid updates
+                needs_update = (~converged) & (np.abs(denominator) > 1e-12)
+                
+                if np.any(needs_update):
+                    delta_x = np.where(needs_update, 
+                                     f_val * (x - x_prev) / denominator, 
+                                     0.0)
+                    
+                    # Update x_prev before updating x
+                    x_prev = np.where(needs_update, x, x_prev)
+                    x = x - delta_x
+                
+            except Exception as e:
+                warnings.warn(f"Vectorized Secant solver error: {e}")
+                break
         
         return x, converged
 
@@ -1260,22 +1546,66 @@ class HybridSolver(ConvergenceBase):
         
         return x, converged
 
+    def solve_vectorized(self, f_func, df_func, x0, tolerance=0.01, max_iterations=50,
+                        x_bounds=None, **kwargs):
+        """Solve using fully vectorized hybrid approach."""
+        
+        # First try vectorized Newton-Raphson (fast)
+        newton_solver = NewtonRaphsonSolver()
+        x, converged = newton_solver.solve_vectorized(f_func, df_func, x0, tolerance, 
+                                                     min(10, max_iterations))
+        
+        # For points that didn't converge, try vectorized Brent
+        if not np.all(converged):
+            failed_mask = ~converged
+            
+            if np.any(failed_mask):
+                try:
+                    # Create modified functions that work on full arrays but only update failed points
+                    def hybrid_f_func(x_full):
+                        return f_func(x_full)
+                    
+                    def hybrid_df_func(x_full):
+                        return df_func(x_full)
+                    
+                    # Set up bounds for Brent method
+                    if x_bounds is not None:
+                        brent_bounds = x_bounds
+                    else:
+                        # Create bounds based on current state
+                        lower_bounds = np.where(failed_mask, x - 10.0, x)
+                        upper_bounds = np.where(failed_mask, x + 5.0, x)
+                        brent_bounds = (lower_bounds, upper_bounds)
+                    
+                    # Try Brent on all points (will only update failed ones effectively)
+                    brent_solver = BrentSolver()
+                    x_brent, conv_brent = brent_solver.solve_vectorized(
+                        hybrid_f_func, hybrid_df_func, x, tolerance, 
+                        max_iterations - 10, x_bounds=brent_bounds)
+                    
+                    # Update results for failed points
+                    x = np.where(failed_mask, x_brent, x)
+                    converged = converged | (failed_mask & conv_brent)
+                    
+                except Exception as e:
+                    warnings.warn(f"Vectorized Hybrid fallback error: {e}")
+        
+        return x, converged
+
 
 # =============================================================================
 # MAIN CALCULATION FUNCTION - Davies-Jones Implementation
 # =============================================================================
-
 def davies_jones_wet_bulb(temp_c, rh_percent, pressure_hpa, 
                          vapor='bolton', convergence='newton',
                          tolerance=0.01, max_iterations=None):
     """
-    Davies-Jones wet bulb calculator with modular vapor pressure and convergence methods.
+    Davies-Jones wet bulb calculator with automatic scalar/vectorized path selection.
     
     This function implements the Davies-Jones iterative method for calculating
     wet bulb temperature with support for multiple vapor pressure formulations
-    and convergence algorithms. The main aim is to have one wet bulb function
-    that can handle multiple climate conditions by switching between appropriate
-    computational methods.
+    and convergence algorithms. Automatically chooses between scalar and vectorized
+    processing paths for optimal performance and reliability.
     
     Parameters
     ----------
@@ -1343,57 +1673,17 @@ def davies_jones_wet_bulb(temp_c, rh_percent, pressure_hpa,
     - γ is the psychrometric constant
     - T is dry bulb temperature, Tw is wet bulb temperature
     
+    **Automatic Path Selection:**
+    
+    - VECTORIZED PATH: Used for arrays (faster processing)
+    - SCALAR PATH: Used for single points or as fallback (more robust)
+    
     **Method Selection Guidelines:**
     
     For operational meteorology: vapor='buck', convergence='newton'
     For climate research: vapor='hyland_wexler', convergence='hybrid'
     For extreme conditions: vapor='buck', convergence='brent'
     For highest accuracy: vapor='hyland_wexler', convergence='halley'
-    
-    **Physical Constants Used:**
-    
-    - Specific heat of dry air: 1005.0 J/kg/K
-    - Latent heat of vaporization: 2.501e6 J/kg
-    - Molecular weight ratio (water/air): 0.622
-    
-    **Input Validation:**
-    
-    All inputs are automatically clipped to physically reasonable ranges
-    to ensure numerical stability and prevent convergence failures.
-    
-    Examples
-    --------
-    Basic usage with default methods:
-    
-    >>> wb = davies_jones_wet_bulb(25.0, 60.0, 1013.25)
-    >>> print(f"Wet bulb: {wb:.3f}°C")
-    Wet bulb: 18.048°C
-    
-    Using different vapor pressure method:
-    
-    >>> wb = davies_jones_wet_bulb(25.0, 60.0, 1013.25, vapor='buck', convergence='brent')
-    >>> print(f"Buck method: {wb:.3f}°C")
-    Buck method: 18.051°C
-    
-    Array operations for multiple points:
-    
-    >>> import numpy as np
-    >>> temps = np.array([-10, 25, 40])
-    >>> rhs = np.array([80, 60, 95])
-    >>> pressures = np.array([850, 1013, 1013])
-    >>> wbs = davies_jones_wet_bulb(temps, rhs, pressures, 
-    ...                             vapor='hyland_wexler', convergence='hybrid')
-    >>> print(wbs)
-    array([-11.234, 18.048, 38.956])
-    
-    High-precision calculation:
-    
-    >>> wb_precise = davies_jones_wet_bulb(25.0, 60.0, 1013.25,
-    ...                                    vapor='hyland_wexler', 
-    ...                                    convergence='halley',
-    ...                                    tolerance=0.001)
-    >>> print(f"High precision: {wb_precise:.4f}°C")
-    High precision: 18.0481°C
     
     References
     ----------
@@ -1432,11 +1722,11 @@ def davies_jones_wet_bulb(temp_c, rh_percent, pressure_hpa,
     # Track if input was scalar for output format
     scalar_input = (temp_c.ndim == 0 and rh_percent.ndim == 0 and pressure_hpa.ndim == 0)
     
-    # Ensure arrays for vectorized operations
-    if scalar_input:
-        temp_c = temp_c.reshape(1)
-        rh_percent = rh_percent.reshape(1)
-        pressure_hpa = pressure_hpa.reshape(1)
+    # Broadcast all inputs to same shape for vectorized operations
+    temp_c, rh_percent, pressure_hpa = np.broadcast_arrays(temp_c, rh_percent, pressure_hpa)
+    
+    # Store original shape for output
+    original_shape = temp_c.shape
     
     # Input validation and clipping to reasonable ranges
     temp_c = np.clip(temp_c, -50, 60)        # Reasonable temperature range
@@ -1470,178 +1760,335 @@ def davies_jones_wet_bulb(temp_c, rh_percent, pressure_hpa,
     Lv = 2.501e6         # Latent heat of vaporization (J/kg)
     epsilon = 0.622      # Molecular weight ratio (water vapor / dry air)
     
-    # FIXED: Process each point individually to avoid closure variable mismatch
-    # This ensures consistent closure variable capture regardless of input type
-    results = []
-    
-    for i in range(len(temp_c)):
-        # Extract single point values (keep as single-element arrays)
-        single_temp_c = temp_c[i:i+1]
-        single_rh_percent = rh_percent[i:i+1]
-        single_pressure_hpa = pressure_hpa[i:i+1]
+    def vector():
+        """
+        VECTORIZED PATH: Process all points simultaneously using vectorized solvers.
         
-        # Convert to working units (Kelvin and Pascal)
-        T_k = single_temp_c + KELVIN
-        P_pa = single_pressure_hpa * 100.0
-        rh_frac = single_rh_percent / 100.0
-        
-        # Calculate actual vapor pressure with numerical stability
-        es = vapor_calc.esat(T_k)  # Saturation vapor pressure
-        e = rh_frac * es           # Actual vapor pressure
-        
-        # CRITICAL: Protect against log(negative) for very low RH
-        e_safe = np.clip(e, 1e-3, None)  # Minimum 1e-3 Pa to prevent log(0) or log(negative)
-        
-        # Calculate dewpoint for initial guess using safe vapor pressure
-        ln_ratio = np.log(e_safe / 611.2)
-        Td_k = KELVIN + 243.5 * ln_ratio / (17.67 - ln_ratio)
-        
-        # Psychrometric constant calculation
-        gamma = (cp * P_pa) / (Lv * epsilon)
-        
-        def calculate_improved_initial_guess(T_k, Td_k, rh_frac):
-            """Calculate improved initial guess for wet bulb temperature."""
-            # Use a combination of approaches for better convergence
-            
-            # Method 1: Weighted average (original approach)
-            guess1 = 0.8 * Td_k + 0.2 * T_k
-            
-            # Method 2: Empirical relationship based on RH
-            rh_factor = np.sqrt(rh_frac)  # Square root relationship works well
-            depression = (T_k - Td_k) * (1 - rh_factor)
-            guess2 = T_k - depression
-            
-            # Method 3: Physical constraint-based approach
-            # Wet bulb should be between dewpoint and dry bulb
-            max_depression = np.minimum(T_k - Td_k, 25.0)  # Limit extreme depressions
-            guess3 = T_k - 0.6 * max_depression
-            
-            # Combine approaches with weights based on conditions
-            T_c = T_k - 273.15
-            
-            # For normal conditions, use empirical approach
-            normal_mask = (T_c >= -10) & (T_c <= 45) & (rh_frac >= 0.2) & (rh_frac <= 0.98)
-            
-            # For extreme conditions, use more conservative approach
-            initial_guess = np.where(normal_mask, guess2, guess1)
-            
-            # Apply final constraints
-            initial_guess = np.minimum(initial_guess, T_k - 0.1)  # Below dry bulb
-            initial_guess = np.maximum(initial_guess, Td_k - 0.1)  # Above dewpoint (with margin)
-            
-            return initial_guess
-
-        # Apply the improved initial guess
-        Tw_k_initial = calculate_improved_initial_guess(T_k, Td_k, rh_frac)
-        
-        # Define the psychrometric equation with consistent single-point closure variables
-        def psychrometric_function(Tw_k):
-            """
-            FIXED: Psychrometric equation with single-point closure variables
-            es(Tw) - e - γ(T - Tw) = 0
-            
-            Now e, gamma, T_k are always single-element arrays for consistent behavior.
-            """
-            Tw_k = np.asarray(Tw_k, dtype=float)
-            
-            # Ensure minimum dimensionality for consistent handling
-            if Tw_k.ndim == 0:
-                Tw_k = Tw_k.reshape(1)
-            
-            # Calculate saturation vapor pressure at wet bulb temperature
-            es_wb = vapor_calc.esat(Tw_k)
-            
-            # Simple calculation since all closure variables are single-element arrays
-            result = es_wb - e[0] - gamma[0] * (T_k[0] - Tw_k)
-            return result
-            
-        def psychrometric_derivative(Tw_k):
-            """
-            FIXED: Derivative with single-point closure variables
-            d/dTw[es(Tw) - e - γ(T - Tw)] = des_dTw + γ
-            
-            Now gamma is always a single-element array for consistent behavior.
-            """
-            Tw_k = np.asarray(Tw_k, dtype=float)
-            
-            if Tw_k.ndim == 0:
-                Tw_k = Tw_k.reshape(1)
-                
-            des_dTw = vapor_calc.esat_derivative(Tw_k)
-            
-            # Simple calculation since gamma is single-element array
-            result = des_dTw + gamma[0]
-            return result
-
-        def psychrometric_second_derivative(Tw_k):
-            """Second derivative of psychrometric equation for Halley's method"""
-            Tw_k = np.asarray(Tw_k)
-            return vapor_calc.esat_second_derivative(Tw_k)
-        
-        # Set default max_iterations if not provided
-        if max_iterations is None:
-            max_iterations = 15 if convergence != 'newton' else 50
-        
-        # Set up bounds for Brent's method
-        if convergence == 'brent' or convergence == 'hybrid':
-            # Ensure bounds bracket the root: dewpoint < wet_bulb < dry_bulb
-            x_bounds = (Td_k - 0.1, T_k - 0.001)  # Small margins for numerical stability
-        else:
-            x_bounds = None
-        
-        # Solve the psychrometric equation using selected method
+        Returns
+        -------
+        result : ndarray
+            Wet bulb temperatures for all points
+        success : bool
+            True if vectorized processing succeeded
+        """
         try:
+            # Convert to working units (Kelvin and Pascal)
+            T_k = temp_c + KELVIN
+            P_pa = pressure_hpa * 100.0
+            rh_frac = rh_percent / 100.0
+            
+            # Calculate actual vapor pressure with numerical stability (vectorized)
+            es = vapor_calc.esat(T_k)  # Saturation vapor pressure
+            e = rh_frac * es           # Actual vapor pressure
+            
+            # CRITICAL: Protect against log(negative) for very low RH
+            e_safe = np.clip(e, 1e-3, None)  # Minimum 1e-3 Pa to prevent log(0) or log(negative)
+            
+            # Calculate dewpoint for initial guess using safe vapor pressure (vectorized)
+            ln_ratio = np.log(e_safe / 611.2)
+            Td_k = KELVIN + 243.5 * ln_ratio / (17.67 - ln_ratio)
+            
+            # Psychrometric constant calculation (vectorized)
+            gamma = (cp * P_pa) / (Lv * epsilon)
+            
+            def calculate_improved_initial_guess(T_k, Td_k, rh_frac):
+                """Calculate improved initial guess for wet bulb temperature (vectorized)."""
+                # Method 1: Weighted average (original approach)
+                guess1 = 0.8 * Td_k + 0.2 * T_k
+                
+                # Method 2: Empirical relationship based on RH
+                rh_factor = np.sqrt(rh_frac)  # Square root relationship works well
+                depression = (T_k - Td_k) * (1 - rh_factor)
+                guess2 = T_k - depression
+                
+                # Method 3: Physical constraint-based approach
+                max_depression = np.minimum(T_k - Td_k, 25.0)  # Limit extreme depressions
+                guess3 = T_k - 0.6 * max_depression
+                
+                # Combine approaches with weights based on conditions
+                T_c = T_k - 273.15
+                normal_mask = (T_c >= -10) & (T_c <= 45) & (rh_frac >= 0.2) & (rh_frac <= 0.98)
+                initial_guess = np.where(normal_mask, guess2, guess1)
+                
+                # Apply final constraints
+                initial_guess = np.minimum(initial_guess, T_k - 0.1)  # Below dry bulb
+                initial_guess = np.maximum(initial_guess, Td_k - 0.1)  # Above dewpoint (with margin)
+                
+                return initial_guess
+
+            # Apply the improved initial guess (vectorized)
+            Tw_k_initial = calculate_improved_initial_guess(T_k, Td_k, rh_frac)
+            
+            # VECTORIZED: Define the psychrometric equation that handles arrays
+            def psychrometric_function(Tw_k):
+                """VECTORIZED: Psychrometric equation for all points simultaneously"""
+                Tw_k = np.asarray(Tw_k, dtype=float)
+                
+                # Ensure Tw_k has the same shape as other arrays
+                if Tw_k.shape != T_k.shape:
+                    if Tw_k.size == 1:
+                        # Broadcast scalar to match array shape
+                        Tw_k = np.full_like(T_k, Tw_k.item())
+                    else:
+                        raise ValueError(f"Shape mismatch: Tw_k={Tw_k.shape}, T_k={T_k.shape}")
+                
+                # Calculate saturation vapor pressure at wet bulb temperature
+                es_wb = vapor_calc.esat(Tw_k)
+                
+                # Vectorized calculation using broadcast arrays
+                result = es_wb - e - gamma * (T_k - Tw_k)
+                return result
+                
+            def psychrometric_derivative(Tw_k):
+                """VECTORIZED: Derivative for all points simultaneously"""
+                Tw_k = np.asarray(Tw_k, dtype=float)
+                
+                # Ensure Tw_k has the same shape as other arrays
+                if Tw_k.shape != T_k.shape:
+                    if Tw_k.size == 1:
+                        Tw_k = np.full_like(T_k, Tw_k.item())
+                    else:
+                        raise ValueError(f"Shape mismatch in derivative: Tw_k={Tw_k.shape}, T_k={T_k.shape}")
+                    
+                des_dTw = vapor_calc.esat_derivative(Tw_k)
+                
+                # Vectorized calculation
+                result = des_dTw + gamma
+                return result
+
+            def psychrometric_second_derivative(Tw_k):
+                """Second derivative of psychrometric equation for Halley's method (vectorized)"""
+                Tw_k = np.asarray(Tw_k, dtype=float)
+                
+                # Ensure Tw_k has the same shape as other arrays
+                if Tw_k.shape != T_k.shape:
+                    if Tw_k.size == 1:
+                        Tw_k = np.full_like(T_k, Tw_k.item())
+                    else:
+                        raise ValueError(f"Shape mismatch in second derivative: Tw_k={Tw_k.shape}, T_k={T_k.shape}")
+                
+                return vapor_calc.esat_second_derivative(Tw_k)
+            
+            # Set default max_iterations if not provided
+            max_iter = max_iterations if max_iterations is not None else (15 if convergence != 'newton' else 50)
+            
+            # Set up bounds for Brent's method (vectorized)
+            if convergence == 'brent' or convergence == 'hybrid':
+                # Ensure bounds bracket the root: dewpoint < wet_bulb < dry_bulb
+                x_bounds = (Td_k - 0.1, T_k - 0.001)  # Small margins for numerical stability
+            else:
+                x_bounds = None
+            
+            # VECTORIZED: Solve the psychrometric equation for all points simultaneously
             if convergence == 'halley':
-                Tw_k_result, converged = solver.solve(
+                Tw_k_result, converged = solver.solve_vectorized(
                     psychrometric_function,
                     psychrometric_derivative,
                     Tw_k_initial,
                     tolerance=tolerance,
-                    max_iterations=max_iterations,
+                    max_iterations=max_iter,
                     d2f_func=psychrometric_second_derivative
                 )
             else:
-                Tw_k_result, converged = solver.solve(
+                Tw_k_result, converged = solver.solve_vectorized(
                     psychrometric_function,
                     psychrometric_derivative,
                     Tw_k_initial,
                     tolerance=tolerance,
-                    max_iterations=max_iterations,
+                    max_iterations=max_iter,
                     x_bounds=x_bounds
                 )
+            
+            # Convert result to Celsius (vectorized)
+            result = Tw_k_result - KELVIN
+            
+            # Apply physical constraints to ensure realistic results (vectorized)
+            result = np.minimum(result, temp_c - 0.001)  # Wet bulb ≤ dry bulb
+            result = np.maximum(result, temp_c - 50.0)   # Reasonable lower bound
+            
+            # Issue warnings for non-converged points
+            if not np.all(converged):
+                num_failed = np.sum(~converged)
+                warnings.warn(f"{num_failed} points failed to converge with {vapor}+{convergence} (vectorized path)")
+            
+            return result, True
+            
         except Exception as e:
-            # Final fallback to Newton-Raphson
-            warnings.warn(f"Convergence failed: {e}. Using fallback Newton-Raphson method.")
-            fallback_solver = NewtonRaphsonSolver()
-            Tw_k_result, converged = fallback_solver.solve(
-                psychrometric_function,
-                psychrometric_derivative,
-                Tw_k_initial,
-                tolerance=tolerance,
-                max_iterations=max_iterations
-            )
-        
-        # Convert result to Celsius
-        result = Tw_k_result - KELVIN
-        
-        # Apply physical constraints to ensure realistic results
-        result = np.minimum(result, single_temp_c - 0.001)  # Wet bulb ≤ dry bulb
-        result = np.maximum(result, single_temp_c - 50.0)   # Reasonable lower bound
-        
-        # Issue warnings for non-converged points
-        if not np.all(converged):
-            warnings.warn(f"Point {i+1} failed to converge with {vapor}+{convergence}")
-        
-        results.append(result[0])  # Extract scalar result
+            warnings.warn(f"Vectorized path failed: {e}. Falling back to scalar path.")
+            return None, False
     
-    # Convert results to array
-    result_array = np.array(results)
+    def scalar():
+        """
+        SCALAR PATH: Process each point individually using scalar solvers.
+        
+        Returns
+        -------
+        result : ndarray
+            Wet bulb temperatures for all points
+        """
+        # Flatten arrays for processing
+        temp_c_flat = temp_c.ravel()
+        rh_percent_flat = rh_percent.ravel()
+        pressure_hpa_flat = pressure_hpa.ravel()
+        
+        results = []
+        
+        for i in range(len(temp_c_flat)):
+            # Extract single point values (keep as single-element arrays)
+            single_temp_c = temp_c_flat[i:i+1]
+            single_rh_percent = rh_percent_flat[i:i+1]
+            single_pressure_hpa = pressure_hpa_flat[i:i+1]
+            
+            # Convert to working units (Kelvin and Pascal)
+            T_k = single_temp_c + KELVIN
+            P_pa = single_pressure_hpa * 100.0
+            rh_frac = single_rh_percent / 100.0
+            
+            # Calculate actual vapor pressure with numerical stability
+            es = vapor_calc.esat(T_k)  # Saturation vapor pressure
+            e = rh_frac * es           # Actual vapor pressure
+            
+            # CRITICAL: Protect against log(negative) for very low RH
+            e_safe = np.clip(e, 1e-3, None)  # Minimum 1e-3 Pa to prevent log(0) or log(negative)
+            
+            # Calculate dewpoint for initial guess using safe vapor pressure
+            ln_ratio = np.log(e_safe / 611.2)
+            Td_k = KELVIN + 243.5 * ln_ratio / (17.67 - ln_ratio)
+            
+            # Psychrometric constant calculation
+            gamma = (cp * P_pa) / (Lv * epsilon)
+            
+            def calculate_improved_initial_guess(T_k, Td_k, rh_frac):
+                """Calculate improved initial guess for wet bulb temperature."""
+                # Method 1: Weighted average (original approach)
+                guess1 = 0.8 * Td_k + 0.2 * T_k
+                
+                # Method 2: Empirical relationship based on RH
+                rh_factor = np.sqrt(rh_frac)  # Square root relationship works well
+                depression = (T_k - Td_k) * (1 - rh_factor)
+                guess2 = T_k - depression
+                
+                # Method 3: Physical constraint-based approach
+                max_depression = np.minimum(T_k - Td_k, 25.0)  # Limit extreme depressions
+                guess3 = T_k - 0.6 * max_depression
+                
+                # Combine approaches with weights based on conditions
+                T_c = T_k - 273.15
+                normal_mask = (T_c >= -10) & (T_c <= 45) & (rh_frac >= 0.2) & (rh_frac <= 0.98)
+                initial_guess = np.where(normal_mask, guess2, guess1)
+                
+                # Apply final constraints
+                initial_guess = np.minimum(initial_guess, T_k - 0.1)  # Below dry bulb
+                initial_guess = np.maximum(initial_guess, Td_k - 0.1)  # Above dewpoint (with margin)
+                
+                return initial_guess
+
+            # Apply the improved initial guess
+            Tw_k_initial = calculate_improved_initial_guess(T_k, Td_k, rh_frac)
+            
+            # Define the psychrometric equation with consistent single-point closure variables
+            def psychrometric_function(Tw_k):
+                """SCALAR: Psychrometric equation with single-point closure variables"""
+                Tw_k = np.asarray(Tw_k, dtype=float)
+                
+                # Ensure minimum dimensionality for consistent handling
+                if Tw_k.ndim == 0:
+                    Tw_k = Tw_k.reshape(1)
+                
+                # Calculate saturation vapor pressure at wet bulb temperature
+                es_wb = vapor_calc.esat(Tw_k)
+                
+                # Simple calculation since all closure variables are single-element arrays
+                result = es_wb - e[0] - gamma[0] * (T_k[0] - Tw_k)
+                return result
+                
+            def psychrometric_derivative(Tw_k):
+                """SCALAR: Derivative with single-point closure variables"""
+                Tw_k = np.asarray(Tw_k, dtype=float)
+                
+                if Tw_k.ndim == 0:
+                    Tw_k = Tw_k.reshape(1)
+                    
+                des_dTw = vapor_calc.esat_derivative(Tw_k)
+                
+                # Simple calculation since gamma is single-element array
+                result = des_dTw + gamma[0]
+                return result
+
+            def psychrometric_second_derivative(Tw_k):
+                """Second derivative of psychrometric equation for Halley's method"""
+                Tw_k = np.asarray(Tw_k)
+                return vapor_calc.esat_second_derivative(Tw_k)
+            
+            # Set default max_iterations if not provided
+            max_iter = max_iterations if max_iterations is not None else (15 if convergence != 'newton' else 50)
+            
+            # Set up bounds for Brent's method
+            if convergence == 'brent' or convergence == 'hybrid':
+                # Ensure bounds bracket the root: dewpoint < wet_bulb < dry_bulb
+                x_bounds = (Td_k - 0.1, T_k - 0.001)  # Small margins for numerical stability
+            else:
+                x_bounds = None
+            
+            # Solve the psychrometric equation using selected method
+            try:
+                if convergence == 'halley':
+                    Tw_k_result, converged = solver.solve(
+                        psychrometric_function,
+                        psychrometric_derivative,
+                        Tw_k_initial,
+                        tolerance=tolerance,
+                        max_iterations=max_iter,
+                        d2f_func=psychrometric_second_derivative
+                    )
+                else:
+                    Tw_k_result, converged = solver.solve(
+                        psychrometric_function,
+                        psychrometric_derivative,
+                        Tw_k_initial,
+                        tolerance=tolerance,
+                        max_iterations=max_iter,
+                        x_bounds=x_bounds
+                    )
+            except Exception as e:
+                # Final fallback to Newton-Raphson
+                warnings.warn(f"Convergence failed: {e}. Using fallback Newton-Raphson method.")
+                fallback_solver = NewtonRaphsonSolver()
+                Tw_k_result, converged = fallback_solver.solve(
+                    psychrometric_function,
+                    psychrometric_derivative,
+                    Tw_k_initial,
+                    tolerance=tolerance,
+                    max_iterations=max_iter
+                )
+            
+            # Convert result to Celsius
+            point_result = Tw_k_result - KELVIN
+            
+            # Apply physical constraints to ensure realistic results
+            point_result = np.minimum(point_result, single_temp_c - 0.001)  # Wet bulb ≤ dry bulb
+            point_result = np.maximum(point_result, single_temp_c - 50.0)   # Reasonable lower bound
+            
+            # Issue warnings for non-converged points
+            if not np.all(converged):
+                warnings.warn(f"Point {i+1} failed to converge with {vapor}+{convergence} (scalar path)")
+            
+            results.append(point_result[0])  # Extract scalar result
+        
+        # Convert results to array and reshape
+        result = np.array(results).reshape(original_shape)
+        return result
+    
+    # PATH SELECTION: Try vectorized first, fall back to scalar if needed
+    result, vectorized_success = vector()
+    
+    if not vectorized_success:
+        result = scalar()
     
     # Return scalar if input was scalar, otherwise return array
     if scalar_input:
-        return float(result_array[0])
-    return result_array
-
+        return float(result.item())
+    return result
 
 # =============================================================================
 # DEMONSTRATION AND TESTING - Professional Validation Suite
