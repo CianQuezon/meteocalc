@@ -1,5 +1,4 @@
 """
-
 Calculates different vapor saturations with different equations using Numba.
 
 Equation:
