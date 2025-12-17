@@ -14,7 +14,6 @@ import numpy.typing as npt
 
 from numba import njit, prange
 
-
 @njit
 def _bolton_scalar(temp_k: float) -> float:
     """
