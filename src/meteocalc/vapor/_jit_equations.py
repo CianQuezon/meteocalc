@@ -4,6 +4,7 @@ Calculates different vapor saturations with different equations using Numba.
 Equation:
 - Goff & Gratch
 - Bolton
+- Hyland Wexler
 
 Author: Cian Quezon
 """
@@ -126,4 +127,69 @@ def _goff_gratch_vector(temp_k: npt.ArrayLike, T_ref, A, B, C, C_exp, D, D_exp, 
     result = np.empty(n, dtype=np.float64)
     for i in prange(n):
         result[i] = _goff_gratch_scalar(temp_k[i], T_ref, A, B, C, C_exp, D, D_exp, log_p_ref)
+    return result
+
+@njit
+def _hyland_wexler_scalar(temp_k: float, A, B, C, D,
+                          E, F, G) -> float:
+    """
+    Function which calculates vapor saturation using Hyland Wexler.
+    
+    Equation:
+        ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
+    
+    Args:
+        temp_k: Array of temperatures in Kelvin
+        A: Coefficient for 1/T term [K]
+        B: Constant coefficient [dimensionless]
+        C: Coefficient for T term [K⁻¹]
+        D: Coefficient for T² term [K⁻²]
+        E: Coefficient for T³ term [K⁻³]
+        F: Coefficient for T⁴ term [K⁻⁴]
+        G: Coefficient for ln(T) term [dimensionless]
+
+    Returns:
+        Saturation vapor pressure in hectoPascals (hPa)    
+
+    """
+
+    A_sum = A/temp_k
+    B_sum = B
+    C_sum = C * temp_k
+    D_sum = D * (temp_k**2)
+    E_sum = E * (temp_k**3)
+    F_sum = F * (temp_k**4)
+    G_sum = G * np.log(temp_k)
+
+    ln_ew = A_sum + B_sum + C_sum + D_sum + E_sum + F_sum + G_sum
+
+    return np.exp(ln_ew) / 100
+
+
+@njit(parallel=True, fastmath=True)
+def _hyland_wexler_vectorised(temp_k: npt.ArrayLike, A, B, C, D, E,
+                              F, G) -> npt.ArrayLike:
+    """
+    Calculates saturation vapor using Hyland Wexler for Arrays
+
+    Equation:
+        ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
+    
+    Args:
+        temp_k: Array of temperatures in Kelvin
+        A: Coefficient for 1/T term [K]
+        B: Constant coefficient [dimensionless]
+        C: Coefficient for T term [K⁻¹]
+        D: Coefficient for T² term [K⁻²]
+        E: Coefficient for T³ term [K⁻³]
+        F: Coefficient for T⁴ term [K⁻⁴]
+        G: Coefficient for ln(T) term [dimensionless]
+
+    Returns:
+        Saturation vapor pressure in hectoPascals (hPa)   
+    """
+    n = len(temp_k)
+    result = np.empty(n, dtype=np.float64)
+    for i in prange(n):
+        result[i] = _hyland_wexler_scalar(temp_k[i], A, B, C, D, E, F, G)
     return result

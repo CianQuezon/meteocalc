@@ -26,7 +26,6 @@ class GoffGratchConstants(NamedTuple):
 
     """
     T_ref: np.float64
-    P_ref: np.float64
     A: np.float64
     B: np.float64
     C: np.float64
@@ -37,7 +36,6 @@ class GoffGratchConstants(NamedTuple):
 
 GOFF_GRATCH_WATER = GoffGratchConstants(
     T_ref=373.16,
-    P_ref=1013.246,
     A=-7.90298,
     B=5.02808,
     C=-1.3816e-7,
@@ -49,7 +47,6 @@ GOFF_GRATCH_WATER = GoffGratchConstants(
 
 GOFF_GRATCH_ICE = GoffGratchConstants(
     T_ref=273.16,
-    P_ref=6.1071,
     A=-9.09718,
     B=-3.56654,
     C=0.876793,
