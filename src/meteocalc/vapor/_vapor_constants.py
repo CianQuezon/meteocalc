@@ -25,14 +25,14 @@ class GoffGratchConstants(NamedTuple):
                 + log₁₀(pᵣₑf)
 
     """
-    T_ref: np.float64
-    A: np.float64
-    B: np.float64
-    C: np.float64
-    C_exp: np.float64
-    D: np.float64
-    D_exp: np.float64
-    log_p_ref: np.float64
+    T_ref: float
+    A: float
+    B: float
+    C: float
+    C_exp: float
+    D: float
+    D_exp: float
+    log_p_ref: float
 
 GOFF_GRATCH_WATER = GoffGratchConstants(
     T_ref=373.16,
@@ -64,13 +64,13 @@ class HylandWexlerConstants(NamedTuple):
     Equation:
         ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
     """
-    A: np.float64
-    B: np.float64
-    C: np.float64
-    D: np.float64
-    E: np.float64
-    F: np.float64
-    G: np.float64
+    A: float
+    B: float
+    C: float
+    D: float
+    E: float
+    F: float
+    G: float
 
 HYLAND_WEXLER_WATER = HylandWexlerConstants(
     A=-0.58002206e4,
