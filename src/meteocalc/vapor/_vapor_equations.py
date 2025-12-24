@@ -14,7 +14,7 @@ import numpy.typing as npt
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Tuple, Union, Callable, NamedTuple, Optional
+from typing import Tuple, Union, Callable, NamedTuple, Optional, cast
 from meteorological_equations.vapor._enums import SurfaceType, EquationName
 from meteorological_equations.vapor._vapor_constants import (
     GOFF_GRATCH_ICE, GOFF_GRATCH_WATER, 
@@ -39,6 +39,19 @@ class VaporEquation(ABC):
     temp_bounds: Tuple[float, float]
     name: EquationName
 
+    def __init__(self, surface_type: Union[SurfaceType, str] = SurfaceType.AUTOMATIC):
+        if isinstance(surface_type, str):
+            try:
+                surface_type = SurfaceType(surface_type.lower())
+            except ValueError:
+                valid = [s.value for s in SurfaceType]
+                raise ValueError(
+                    f"Invalid surface type: '{surface_type}'"
+                    f"Valid ones are: {valid}"
+                )
+        self.surface_type = surface_type
+        self._update_temp_bounds()
+
     def _calculate_automatic_equation(self, temp_k: Union[np.ndarray, float], scalar_func: Callable[[float, Optional[NamedTuple]], float],
                                       vector_func: Callable[[np.ndarray, Optional[NamedTuple]], np.ndarray], water_constants: NamedTuple, ice_constants: NamedTuple) -> Union[np.ndarray, float]:
         """
@@ -52,45 +65,46 @@ class VaporEquation(ABC):
             - scalar_func(Callable[[float, Optional[NamedTuple]], float]) = scalar function that takes in a temperature with optional, either water or ice constants.
             - vector_func(Callable[[np.ndarray, Optional[NamedTuple]], np.ndarray]) = vectorised function that takes in temperature array and outputs an array of vapor saturation in hPa. Optionally uses water or ice constants.
             - water_constants(Optional[Named_Tuple]) = water constants for over water equation
-            - ice_constants(Optional[Named_Tuple]) = ice constants for over ice equation
+            - ice_constants(Optional[Named_Tuple]) =ice constants for over ice equation
         
         Returns:
             Array or scalar saturation vapor in hPA
         """
         
-        temp_k = np.asarray(temp_k)
+        temp_arr = np.asarray(temp_k)
 
-        at_freezing, above_freezing, below_freezing = self._detect_surface_type(temp_k=temp_k)
+        at_freezing, above_freezing, below_freezing = self._detect_surface_type(temp_k=temp_arr)
 
-        if temp_k.ndim == 0:
+        if temp_arr.ndim == 0:
 
-            temp_val = temp_k.item()
-
+            temp_val = temp_arr.item()
+ 
             if above_freezing.item():
                 return scalar_func(temp_val, *water_constants)
-            elif below_freezing.item():
+            
+            if below_freezing.item():
                 return scalar_func(temp_val, *ice_constants)
-            elif at_freezing.item():
-                on_water_vapor = scalar_func(temp_val, *water_constants)
-                on_ice_vapor = scalar_func(temp_val, *ice_constants)
-                average = (on_water_vapor + on_ice_vapor)/2
-                return average
+
+            on_water_vapor = scalar_func(temp_val, *water_constants)
+            on_ice_vapor = scalar_func(temp_val, *ice_constants)
+            average = (on_water_vapor + on_ice_vapor)/2
+            return average
         
         else:
-            result = np.empty_like(temp_k, dtype=np.float64)
+            result = np.empty_like(temp_arr, dtype=np.float64)
 
             if np.any (above_freezing):
-                result[above_freezing] = vector_func(temp_k[above_freezing], *water_constants)
+                result[above_freezing] = vector_func(temp_arr[above_freezing], *water_constants)
             if np.any (below_freezing):
-                result[below_freezing] = vector_func(temp_k[below_freezing], *ice_constants)
+                result[below_freezing] = vector_func(temp_arr[below_freezing], *ice_constants)
             if np.any(at_freezing):
-                over_ice_results = vector_func(temp_k[at_freezing], *ice_constants)
-                over_water_results = vector_func(temp_k[at_freezing], *water_constants)
+                over_ice_results = vector_func(temp_arr[at_freezing], *ice_constants)
+                over_water_results = vector_func(temp_arr[at_freezing], *water_constants)
                 result[at_freezing] = (over_ice_results + over_water_results)/2
-            return result
+            return cast(np.ndarray, result)
 
-    def _dispatch_scalar_or_vector(self, temp_k: Union[npt.ArrayLike, float] , scalar_func: Callable[[float, Optional[NamedTuple]], float], 
-                                   vector_func: Callable[[np.ndarray, Optional[NamedTuple]], np.ndarray], equation_constant: Optional[NamedTuple]) -> Union[np.ndarray, float]:
+    def _dispatch_scalar_or_vector(self, temp_k: Union[npt.ArrayLike, float] , scalar_func: Callable[[float], float], 
+                                   vector_func: Callable[[np.ndarray], np.ndarray], equation_constant: Optional[NamedTuple]) -> Union[np.ndarray, float]:
         """
         calculates saturation vapor using the equation's scalar or vectorised function depending on
         input temperature dimensions.  
@@ -103,7 +117,6 @@ class VaporEquation(ABC):
          
          Returns:
           Array or scalar saturation vapor in hPA
-
         """
         temp_k = np.asarray(temp_k)
         if temp_k.ndim == 0:
@@ -121,7 +134,7 @@ class VaporEquation(ABC):
                 vapor_pressure = vector_func(temp_k_flatten, *equation_constant)
             else:
                 vapor_pressure = vector_func(temp_k_flatten)
-            return vapor_pressure.reshape(temp_k_original_shape)
+            return cast(np.ndarray, vapor_pressure.reshape(temp_k_original_shape))
 
     def _check_bounds(self, temp_k: Union[npt.ArrayLike, float]) -> None:
         """
@@ -163,7 +176,14 @@ class VaporEquation(ABC):
         return at_freezing, above_freezing, below_freezing
 
     @abstractmethod
-    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
+    def _update_temp_bounds(self) -> None:
+        """
+        Sets the temperature bounds of the equation
+        """
+        pass
+
+    @abstractmethod
+    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, float]:
         """
         Calculates saturation vapor at a given temperature.
 
@@ -182,9 +202,23 @@ class BoltonEquation(VaporEquation):
     Notes:
         - Bolton Equation has only over water calculations
     """
-    surface_type: SurfaceType = SurfaceType.WATER
-    temp_bounds: Tuple[float, float] = (238.15, 308.15)
     name: EquationName = EquationName.BOLTON
+
+    def __init__(self, surface_type: SurfaceType = SurfaceType.WATER):
+        
+        if isinstance(surface_type, str):
+            surface_type = SurfaceType(surface_type.lower())
+        
+        if surface_type in (SurfaceType.ICE, SurfaceType.AUTOMATIC):
+            raise ValueError("Bolton only supports water")
+        
+        super().__init__(surface_type)
+
+    def _update_temp_bounds(self) -> None:
+        """
+        Bolton has a fixed temperature range since it only supports over water equation.
+        """
+        self.temp_bounds = (243.15, 313.15)
 
     def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)    
@@ -197,10 +231,16 @@ class GoffGratchEquation(VaporEquation):
     """
     Calculates saturation vapor using Goff Gratch Equation
     """
-    surface_type: SurfaceType = SurfaceType.AUTOMATIC
-    temp_bounds: Tuple[float, float] = (173.15, 373.15)
     name: EquationName = EquationName.GOFF_GRATCH
 
+    def _update_temp_bounds(self) -> None:
+        if self.surface_type == SurfaceType.AUTOMATIC:
+            self.temp_bounds = (173.15, 373.15)
+        elif self.surface_type == SurfaceType.WATER:
+            self.temp_bounds = (273.15, 373.15)
+        elif self.surface_type == SurfaceType.ICE:
+            self.temp_bounds = (173.15, 273.16)
+    
     def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
 
         temp_k = np.asarray(temp_k)
@@ -222,9 +262,16 @@ class HylandWexlerEquation(VaporEquation):
     """
     Calculates saturation vapor using Hyland Wexler Equation
     """
-    surface_type: SurfaceType = SurfaceType.AUTOMATIC
-    temp_bounds: Tuple[float, float] = (173.15, 473.15)
     name: EquationName = EquationName.HYLAND_WEXLER
+
+    def _update_temp_bounds(self) -> None:
+        
+        if self.surface_type == SurfaceType.AUTOMATIC:
+            self.temp_bounds = (173.15, 473.15)
+        elif self.surface_type == SurfaceType.WATER:
+            self.temp_bounds = (273.15, 473.15)
+        elif self.surface_type == SurfaceType.ICE:
+            self.temp_bounds = (173.15, 273.16)
 
     def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)
