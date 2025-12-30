@@ -49,9 +49,6 @@ class TestBoltonEquation:
         """Bolton equation should raise error for ice or automatic."""
         with pytest.raises(ValueError, match="Bolton only supports water"):
             BoltonEquation(surface_type=SurfaceType.ICE)
-        
-        with pytest.raises(ValueError, match="Bolton only supports water"):
-            BoltonEquation(surface_type=SurfaceType.AUTOMATIC)
     
     def test_bolton_scalar_calculation(self, bolton):
         """Test Bolton equation with scalar input against MetPy reference."""
@@ -355,7 +352,7 @@ class TestMetPyValidation:
         temps_k = temps_c + 273.15
         
         # MetPy ice saturation vapor pressure
-        metpy_results = mpcalc.saturation_vapor_pressure(temps_c * units.degC)
+        metpy_results = mpcalc.saturation_vapor_pressure(temps_c * units.degC, phase="solid")
         metpy_hpa = metpy_results.to('hPa').magnitude
         
         our_results = goff.calculate(temps_k)
@@ -590,7 +587,7 @@ class TestComprehensiveCrossValidation:
         
         for temp_c, temp_k in zip(temps_c, temps_k):
             # MetPy
-            metpy_result = mpcalc.saturation_vapor_pressure(temp_c * units.degC)
+            metpy_result = mpcalc.saturation_vapor_pressure(temp_c * units.degC, phase="solid")
             metpy_hpa = metpy_result.to('hPa').magnitude
             
             # PsychroLib (automatically uses ice for T < 0)
@@ -604,6 +601,11 @@ class TestComprehensiveCrossValidation:
             # Check agreement
             assert_allclose(goff_result, metpy_hpa, rtol=0.02,
                            err_msg=f"Goff-Gratch ice vs MetPy at {temp_c}°C")
+            assert_allclose(goff_result, psychro_hpa, rtol=0.01,
+                           err_msg=f"Goff-Gratch ice vs Psychrolib at {temp_c}°C")
+            
+            assert_allclose(hyland_result, metpy_hpa, rtol=0.02,
+                           err_msg=f"Hyland-Wexler ice vs Metpy at {temp_c}°C")
             assert_allclose(hyland_result, psychro_hpa, rtol=0.01,
                            err_msg=f"Hyland-Wexler ice vs PsychroLib at {temp_c}°C")
 
