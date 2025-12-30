@@ -13,7 +13,6 @@ import numpy as np
 import numpy.typing as npt
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Tuple, Union, Callable, NamedTuple, Optional, cast
 from meteorological_equations.vapor._enums import SurfaceType, EquationName
 from meteorological_equations.vapor._vapor_constants import (
@@ -181,7 +180,7 @@ class VaporEquation(ABC):
         Sets the temperature bounds of the equation
         """
         pass
-
+    
     @abstractmethod
     def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, float]:
         """
@@ -209,7 +208,7 @@ class BoltonEquation(VaporEquation):
         if isinstance(surface_type, str):
             surface_type = SurfaceType(surface_type.lower())
         
-        if surface_type in (SurfaceType.ICE, SurfaceType.AUTOMATIC):
+        if surface_type == SurfaceType.ICE:
             raise ValueError("Bolton only supports water")
         
         super().__init__(surface_type)
