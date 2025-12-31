@@ -24,14 +24,16 @@ EQUATION_REGISTRY = {
 }
 
 class Vapor:
-    def list_equations(self) -> List[str]:
+    
+    @staticmethod
+    def list_equations() -> List[str]:
         """
         lists and prints the available equations
         """
         return [equation.value for equation in EquationName]
 
-
-    def get_equation(self, equation: Union[str, EquationName], phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC) -> VaporEquation:
+    @staticmethod
+    def get_equation(equation: Union[str, EquationName], phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC) -> VaporEquation:
         """
         gets the specific saturation vapor equation.
 
@@ -50,7 +52,8 @@ class Vapor:
         return equation_selected
         
 
-    def get_vapor_saturation(self, temp_k: Union[np.ndarray, float], phase: SurfaceType = SurfaceType.WATER, 
+    @staticmethod
+    def get_vapor_saturation(temp_k: Union[np.ndarray, float], phase: SurfaceType = SurfaceType.AUTOMATIC, 
                             equation: Union[EquationName, str] = EquationName.GOFF_GRATCH ) -> Union[np.ndarray, float]:
         """
         gets the vapor pressure saturation using the selected equation at a given temperature in hPa.
@@ -64,7 +67,7 @@ class Vapor:
         Returns:
             - scalar or an array of pressure in hPa
         """
-        equation_selected = self.get_equation(equation, phase=phase)
+        equation_selected = Vapor.get_equation(equation, phase=phase)
         vapor_saturation = equation_selected.calculate(temp_k=temp_k)
         return vapor_saturation
 
