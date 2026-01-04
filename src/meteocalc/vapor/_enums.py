@@ -7,7 +7,9 @@ Implements:
 
 Author: Cian Quezon
 """
+
 from enum import Enum
+
 
 class SurfaceType(Enum):
     """
@@ -20,6 +22,7 @@ class SurfaceType(Enum):
         - ICE = Uses ice constants for vapor saturation equation
         - WATER = Uses water constants for vapor saturation equation
     """
+
     AUTOMATIC = "automatic"
     ICE = "ice"
     WATER = "water"
@@ -34,7 +37,7 @@ class EquationName(Enum):
         - GOFF_GRATCH
         - HYLAND_WEXLER
     """
+
     BOLTON = "bolton"
     GOFF_GRATCH = "goff_gratch"
-    HYLAND_WEXLER = "hyland_wexler" 
-
+    HYLAND_WEXLER = "hyland_wexler"
