@@ -52,7 +52,7 @@ class Solver(ABC):
     method_type: MethodType
     name: SolverName
 
-    def get_method_type(self) -> None:
+    def get_method_type(self) -> str:
         """
         Returns the method type of the solver
         """
