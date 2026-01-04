@@ -52,6 +52,12 @@ class Solver(ABC):
     method_type: MethodType
     name: SolverName
 
+    def get_method_type(self) -> str:
+        """
+        Returns the method type of the solver
+        """
+        return self.method_type.value
+
     def _dispatch_root_bracket_method(
         self,
         func: Callable[[float], float],
