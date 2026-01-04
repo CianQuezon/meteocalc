@@ -4,7 +4,6 @@ Unit tests for root finding solvers with Numba JIT compilation.
 Tests use scipy as reference implementation to validate correctness.
 """
 
-
 import numpy as np
 import pytest
 from numba import njit

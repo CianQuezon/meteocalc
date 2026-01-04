@@ -3,6 +3,7 @@ Enums for the solvers to get the root
 
 Author: Cian Quezon
 """
+
 from enum import Enum
 
 
