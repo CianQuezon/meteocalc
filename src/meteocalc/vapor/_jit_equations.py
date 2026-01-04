@@ -9,7 +9,6 @@ Equation:
 Author: Cian Quezon
 """
 
-
 import numpy as np
 import numpy.typing as npt
 from numba import njit, prange

@@ -8,6 +8,7 @@ Implements:
 
 Author: Cian Quezon
 """
+
 import warnings
 from abc import ABC, abstractmethod
 from typing import Callable, NamedTuple, Optional, Tuple, Union, cast
@@ -53,7 +54,7 @@ class VaporEquation(ABC):
             except ValueError as err:
                 valid = [s.value for s in SurfaceType]
                 raise ValueError(
-                    f"Invalid surface type: '{surface_type}'" f"Valid ones are: {valid}"
+                    f"Invalid surface type: '{surface_type}'Valid ones are: {valid}"
                 ) from err
         self.surface_type = surface_type
         self._update_temp_bounds()

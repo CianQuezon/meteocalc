@@ -9,6 +9,7 @@ Author: Cian Quezon
 References:
     https://cires1.colorado.edu/~voemel/vp.html
 """
+
 from typing import NamedTuple
 
 import numpy as np

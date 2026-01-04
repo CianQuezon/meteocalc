@@ -7,6 +7,7 @@ Implements:
 
 Author: Cian Quezon
 """
+
 from enum import Enum
 
 
