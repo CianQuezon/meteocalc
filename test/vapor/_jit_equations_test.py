@@ -55,9 +55,9 @@ class TestBoltonEquation:
         """Validate Bolton scalar implementation against NOAA reference values."""
         result = _bolton_scalar(temp_k)
         tolerance = expected_es * 0.05  # 5% tolerance for Bolton approximation
-        assert (
-            abs(result - expected_es) < tolerance
-        ), f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        assert abs(result - expected_es) < tolerance, (
+            f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        )
 
     def test_scalar_at_freezing_point(self):
         """Test Bolton at water freezing point."""
@@ -71,9 +71,9 @@ class TestBoltonEquation:
 
         for i, temp in enumerate(temps):
             scalar_result = _bolton_scalar(temp)
-            assert (
-                abs(vec_result[i] - scalar_result) < 1e-10
-            ), f"Mismatch at {temp}K: {vec_result[i]} vs {scalar_result}"
+            assert abs(vec_result[i] - scalar_result) < 1e-10, (
+                f"Mismatch at {temp}K: {vec_result[i]} vs {scalar_result}"
+            )
 
     def test_vectorised_output_shape(self):
         """Test vectorized output has correct shape and dtype."""
@@ -105,18 +105,18 @@ class TestGoffGratchEquation:
         """Validate Goff-Gratch water equation against NOAA values."""
         result = _goff_gratch_scalar(temp_k, *GOFF_GRATCH_WATER)
         tolerance = expected_es * 0.02  # 2% tolerance for WMO standard
-        assert (
-            abs(result - expected_es) < tolerance
-        ), f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        assert abs(result - expected_es) < tolerance, (
+            f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        )
 
     def test_at_reference_temperature(self):
         """Test Goff-Gratch returns reference pressure at reference temperature."""
         result = _goff_gratch_scalar(GOFF_GRATCH_WATER.T_ref, *GOFF_GRATCH_WATER)
         expected = 1013.246
         tolerance = expected * 0.001  # 0.1% tolerance
-        assert (
-            abs(result - expected) < tolerance
-        ), f"Expected {expected:.2f} hPa, got {result:.2f} hPa"
+        assert abs(result - expected) < tolerance, (
+            f"Expected {expected:.2f} hPa, got {result:.2f} hPa"
+        )
 
     def test_ice_at_triple_point(self):
         """Test Goff-Gratch ice equation at triple point."""
@@ -154,9 +154,9 @@ class TestHylandWexlerEquation:
         """Validate Hyland-Wexler water equation against NOAA values."""
         result = _hyland_wexler_scalar(temp_k, *HYLAND_WEXLER_WATER)
         tolerance = expected_es * 0.02  # 2% tolerance for ASHRAE standard
-        assert (
-            abs(result - expected_es) < tolerance
-        ), f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        assert abs(result - expected_es) < tolerance, (
+            f"Failed for {source}: {result:.2f} hPa vs {expected_es:.2f} hPa"
+        )
 
     def test_vectorised_matches_scalar(self):
         """Verify vectorized Hyland-Wexler matches scalar."""
@@ -206,9 +206,9 @@ class TestCrossValidation:
 
             # MetPy uses same Bolton formula, should match within 0.5%
             rel_diff = np.abs(bolton_results - metpy_results) / metpy_results
-            assert np.all(
-                rel_diff < 0.005
-            ), f"Bolton vs MetPy difference >0.5%: max={np.max(rel_diff) * 100:.2f}%"
+            assert np.all(rel_diff < 0.005), (
+                f"Bolton vs MetPy difference >0.5%: max={np.max(rel_diff) * 100:.2f}%"
+            )
 
         except ImportError:
             pytest.skip("MetPy not installed")
@@ -233,9 +233,9 @@ class TestCrossValidation:
 
             # Different formulations, allow 5% difference
             rel_diff = np.abs(bolton_results - psychro_results) / psychro_results
-            assert np.all(
-                rel_diff < 0.05
-            ), f"Bolton vs psychrolib difference >5%: max={np.max(rel_diff) * 100:.1f}%"
+            assert np.all(rel_diff < 0.05), (
+                f"Bolton vs psychrolib difference >5%: max={np.max(rel_diff) * 100:.1f}%"
+            )
 
         except ImportError:
             pytest.skip("psychrolib not installed")
@@ -260,9 +260,9 @@ class TestCrossValidation:
 
             # Both are standard formulations, should be within 3%
             rel_diff = np.abs(goff_gratch_results - psychro_results) / psychro_results
-            assert np.all(
-                rel_diff < 0.03
-            ), f"Goff-Gratch vs psychrolib difference >3%: max={np.max(rel_diff) * 100:.1f}%"
+            assert np.all(rel_diff < 0.03), (
+                f"Goff-Gratch vs psychrolib difference >3%: max={np.max(rel_diff) * 100:.1f}%"
+            )
 
         except ImportError:
             pytest.skip("psychrolib not installed")
@@ -287,9 +287,9 @@ class TestCrossValidation:
 
             # Different formulations, allow 5% difference
             rel_diff = np.abs(hyland_wexler_results - psychro_results) / psychro_results
-            assert np.all(
-                rel_diff < 0.05
-            ), f"Hyland-Wexler vs psychrolib difference >5%: max={np.max(rel_diff) * 100:.1f}%"
+            assert np.all(rel_diff < 0.05), (
+                f"Hyland-Wexler vs psychrolib difference >5%: max={np.max(rel_diff) * 100:.1f}%"
+            )
 
         except ImportError:
             pytest.skip("psychrolib not installed")
@@ -332,9 +332,9 @@ class TestCrossValidation:
 
             # MetPy uses Bolton, Goff-Gratch is different - allow 10% difference
             rel_diff = np.abs(goff_gratch_results - metpy_results) / metpy_results
-            assert np.all(
-                rel_diff < 0.10
-            ), f"Goff-Gratch vs MetPy difference >10%: max={np.max(rel_diff) * 100:.1f}%"
+            assert np.all(rel_diff < 0.10), (
+                f"Goff-Gratch vs MetPy difference >10%: max={np.max(rel_diff) * 100:.1f}%"
+            )
 
         except ImportError:
             pytest.skip("MetPy not installed")
@@ -353,9 +353,9 @@ class TestCrossValidation:
 
             # MetPy uses Bolton, Hyland-Wexler is different - allow 10% difference
             rel_diff = np.abs(hyland_wexler_results - metpy_results) / metpy_results
-            assert np.all(
-                rel_diff < 0.10
-            ), f"Hyland-Wexler vs MetPy difference >10%: max={np.max(rel_diff) * 100:.1f}%"
+            assert np.all(rel_diff < 0.10), (
+                f"Hyland-Wexler vs MetPy difference >10%: max={np.max(rel_diff) * 100:.1f}%"
+            )
 
         except ImportError:
             pytest.skip("MetPy not installed")
@@ -447,9 +447,9 @@ class TestNumericalPrecision:
         mean_val = np.mean(values)
         rel_diffs = np.abs(values - mean_val) / mean_val
 
-        assert np.all(
-            rel_diffs < 0.1
-        ), f"Equations disagree by >10%: {bolton:.2f}, {goff_gratch:.2f}, {hyland_wexler:.2f}"
+        assert np.all(rel_diffs < 0.1), (
+            f"Equations disagree by >10%: {bolton:.2f}, {goff_gratch:.2f}, {hyland_wexler:.2f}"
+        )
 
 
 # ============================================================================
