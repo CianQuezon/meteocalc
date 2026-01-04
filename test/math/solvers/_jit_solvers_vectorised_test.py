@@ -8,16 +8,15 @@ Author: Cian Quezon
 
 import numpy as np
 import pytest
+from numba import njit
 from numpy.testing import assert_allclose
 from scipy.optimize import bisect, brentq, newton
-from numba import njit
 
 from meteorological_equations.math.solvers._jit_solvers import (  # Replace with actual import
-    _newton_raphson_vectorised,
     _bisection_vectorised,
     _brent_vectorised,
+    _newton_raphson_vectorised,
 )
-
 
 # ========================================================================
 # TEST FUNCTIONS (ALL @njit)
@@ -43,7 +42,7 @@ def f_linear(x):
 
 
 @njit
-def fp_linear(x):
+def fp_linear(_x):
     """Derivative of f_linear"""
     return 2.0
 

@@ -4,11 +4,11 @@ Root finding solvers with using Numba JIT compilation.
 Author: Cian Quezon
 """
 
+from typing import Callable, Tuple
+
 import numpy as np
 import numpy.typing as npt
-
 from numba import njit, prange
-from typing import Union, Callable, Tuple, Optional
 
 
 @njit
@@ -79,7 +79,7 @@ def _newton_raphson_vectorised(
 
     for i in prange(n):
         root, iteration, converged = _newton_raphson_scalar(
-            func=func, func_prime=func_prime, x0=x0[i], max_iter=max_iter
+            func=func, func_prime=func_prime, x0=x0[i], tol=tol, max_iter=max_iter
         )
         root_arr[i] = root
         iterations_arr[i] = iteration

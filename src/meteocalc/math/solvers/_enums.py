@@ -15,9 +15,11 @@ class SolverName(Enum):
      - BRENT = Brent root finding method
      - BISECTION = Bisection root finding method
     """
+
     NEWTON = "newton"
     BRENT = "brent"
     BISECTION = "bisection"
+
 
 class MethodType(Enum):
     """
@@ -29,6 +31,7 @@ class MethodType(Enum):
         - HYBRID = Solver uses a hybrid approach which combines 2 methods
         - CUSTOM = Customized method defined or created by the user
     """
+
     OPEN = "open"
     BRACKET = "bracket"
     HYBRID = "hybrid"
