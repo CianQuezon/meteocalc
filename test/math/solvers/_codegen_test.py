@@ -381,9 +381,12 @@ class TestCodegenEdgeCases:
 
     def test_invalid_method_type(self):
         """Test error handling for invalid method type."""
-        with pytest.raises(ValueError, match="Unsupported method type"):
+        with pytest.raises(ValueError) as exc_info:
             generate_vectorised_solver(_newton_raphson_scalar, 1, "INVALID")
-
+        
+        assert "Invalid enum 'INVALID'" in str(exc_info.value)
+        assert "Available are the following" in str(exc_info.value)
+        
     def test_zero_parameters_bracket(self):
         """Test bracket method with zero parameters."""
         @njit
