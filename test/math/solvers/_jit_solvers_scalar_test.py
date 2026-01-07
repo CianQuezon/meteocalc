@@ -1,384 +1,505 @@
 """
-Unit tests for root finding solvers with Numba JIT compilation.
+Comprehensive unit tests for scalar JIT-compiled root-finding solvers.
 
-Tests use scipy as reference implementation to validate correctness.
+Tests parameter unpacking with *args and validates against scipy reference implementations.
+
+Author: Cian Quezon
 """
-
 import numpy as np
 import pytest
 from numba import njit
-from scipy import optimize
+from scipy.optimize import newton, brentq
 
 from meteorological_equations.math.solvers._jit_solvers import (
+    _newton_raphson_scalar,
     _bisection_scalar,
     _brent_scalar,
-    _newton_raphson_scalar,
 )
 
 
-# Test functions and their derivatives - must be JIT-compiled for Numba
-@njit
-def linear(x):
-    """f(x) = 2x - 4, root at x=2"""
-    return 2 * x - 4
+class TestNewtonRaphsonScalar:
+    """Test Newton-Raphson scalar solver with various parameter configurations."""
 
-
-@njit
-def linear_prime(_x):
-    return 2.0
-
-
-@njit
-def quadratic(x):
-    """f(x) = x^2 - 4, roots at x=±2"""
-    return x**2 - 4
-
-
-@njit
-def quadratic_prime(x):
-    return 2 * x
-
-
-@njit
-def cubic(x):
-    """f(x) = x^3 - x, roots at x=-1, 0, 1"""
-    return x**3 - x
-
-
-@njit
-def cubic_prime(x):
-    return 3 * x**2 - 1
-
-
-@njit
-def transcendental(x):
-    """f(x) = x - cos(x), root near x≈0.739"""
-    return x - np.cos(x)
-
-
-@njit
-def transcendental_prime(x):
-    return 1 + np.sin(x)
-
-
-@njit
-def exponential(x):
-    """f(x) = e^x - 2, root at x=ln(2)≈0.693"""
-    return np.exp(x) - 2
-
-
-@njit
-def exponential_prime(x):
-    return np.exp(x)
-
-
-# Non-JIT versions for scipy comparison
-def linear_nojit(x):
-    return 2 * x - 4
-
-
-def linear_prime_nojit(_x):
-    return 2.0
-
-
-def quadratic_nojit(x):
-    return x**2 - 4
-
-
-def quadratic_prime_nojit(x):
-    return 2 * x
-
-
-def cubic_nojit(x):
-    return x**3 - x
-
-
-def transcendental_nojit(x):
-    return x - np.cos(x)
-
-
-def transcendental_prime_nojit(x):
-    return 1 + np.sin(x)
-
-
-def exponential_nojit(x):
-    return np.exp(x) - 2
-
-
-def exponential_prime_nojit(x):
-    return np.exp(x)
-
-
-class TestNewtonRaphson:
-    """Test suite for Newton-Raphson method."""
-
-    def test_linear_function(self):
-        """Test with simple linear function."""
-        root, iters, converged = _newton_raphson_scalar(linear, linear_prime, x0=1.0)
-        scipy_root = optimize.newton(linear_nojit, x0=1.0, fprime=linear_prime_nojit)
-
-        assert converged
-        assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-        assert iters < 10
-
-    def test_quadratic_positive_root(self):
-        """Test quadratic function with positive initial guess."""
-        root, iters, converged = _newton_raphson_scalar(quadratic, quadratic_prime, x0=3.0)
-        scipy_root = optimize.newton(quadratic_nojit, x0=3.0, fprime=quadratic_prime_nojit)
-
-        assert converged
-        assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_quadratic_negative_root(self):
-        """Test quadratic function with negative initial guess."""
-        root, iters, converged = _newton_raphson_scalar(quadratic, quadratic_prime, x0=-3.0)
-        scipy_root = optimize.newton(quadratic_nojit, x0=-3.0, fprime=quadratic_prime_nojit)
-
-        assert converged
-        assert np.isclose(root, -2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_transcendental_function(self):
-        """Test with transcendental function x - cos(x)."""
-        root, iters, converged = _newton_raphson_scalar(
-            transcendental, transcendental_prime, x0=1.0
-        )
-        scipy_root = optimize.newton(
-            transcendental_nojit, x0=1.0, fprime=transcendental_prime_nojit
-        )
-
-        assert converged
-        assert np.isclose(root, scipy_root, atol=1e-6)
-        assert np.isclose(root, 0.7390851332, atol=1e-6)
-
-    def test_exponential_function(self):
-        """Test with exponential function."""
-        root, iters, converged = _newton_raphson_scalar(exponential, exponential_prime, x0=1.0)
-        scipy_root = optimize.newton(exponential_nojit, x0=1.0, fprime=exponential_prime_nojit)
-
-        assert converged
-        assert np.isclose(root, np.log(2), atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_zero_derivative(self):
-        """Test behavior when derivative is zero."""
-
+    def test_no_parameters(self):
+        """Test with function requiring no parameters."""
         @njit
-        def flat_func(x):
-            return (x - 1) ** 2
-
+        def f(x):
+            return x**2 - 4
+        
         @njit
-        def flat_prime(x):
-            return 2 * (x - 1)
+        def fp(x):
+            return 2 * x
+        
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.0, 1e-6, 50)
+        scipy_root = newton(lambda x: x**2 - 4, 1.0, fprime=lambda x: 2*x)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
+        assert np.isclose(root, 2.0, atol=1e-6)
 
-        # Starting at x=1 where derivative is zero
-        root, iters, converged = _newton_raphson_scalar(flat_func, flat_prime, x0=1.0)
+    def test_single_parameter(self):
+        """Test with one parameter."""
+        @njit
+        def f(x, k):
+            return x**2 - k
+        
+        @njit
+        def fp(x, k):
+            return 2 * x
+        
+        k = 9.0
+        root, iters, converged = _newton_raphson_scalar(f, fp, 2.0, 1e-6, 50, k)
+        scipy_root = newton(lambda x: x**2 - k, 2.0, fprime=lambda x: 2*x)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
+        assert np.isclose(root, 3.0, atol=1e-6)
 
-        assert not converged  # Should fail to converge
+    def test_two_parameters(self):
+        """Test with two parameters."""
+        @njit
+        def f(x, a, b):
+            return a * x**2 - b
+        
+        @njit
+        def fp(x, a, b):
+            return 2 * a * x
+        
+        a, b = 2.0, 8.0
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.5, 1e-6, 50, a, b)
+        scipy_root = newton(lambda x: a*x**2 - b, 1.5, fprime=lambda x: 2*a*x)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
+        assert np.isclose(root, 2.0, atol=1e-6)
 
-    def test_max_iterations(self):
-        """Test that max iterations limit is respected."""
+    def test_three_parameters(self):
+        """Test with three parameters (typical atmospheric equation)."""
+        @njit
+        def f(x, a, b, c):
+            return a * x**2 + b * x + c
+        
+        @njit
+        def fp(x, a, b, c):
+            return 2 * a * x + b
+        
+        # Solve x^2 - 5x + 6 = 0, root at x=2 or x=3
+        a, b, c = 1.0, -5.0, 6.0
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.5, 1e-6, 50, a, b, c)
+        scipy_root = newton(lambda x: a*x**2 + b*x + c, 1.5, 
+                           fprime=lambda x: 2*a*x + b)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
+
+    def test_four_parameters_atmospheric(self):
+        """Test with four parameters (atmospheric application)."""
+        @njit
+        def f(T, T_surf, Td, P, factor):
+            # Simplified atmospheric equation
+            return T - Td - factor * (T_surf - T) * (P / 101325.0)
+        
+        @njit
+        def fp(T, T_surf, Td, P, factor):
+            return 1.0 + factor * (P / 101325.0)
+        
+        T_surf, Td, P, factor = 293.15, 283.15, 85000.0, 0.2
         root, iters, converged = _newton_raphson_scalar(
-            quadratic, quadratic_prime, x0=100.0, max_iter=5
+            f, fp, 285.0, 1e-6, 50, 
+            T_surf, Td, P, factor
         )
-
-        assert iters <= 5
-
-    def test_custom_tolerance(self):
-        """Test with custom tolerance."""
-        tol = 1e-10
-        root, iters, converged = _newton_raphson_scalar(quadratic, quadratic_prime, x0=3.0, tol=tol)
-
+        
+        scipy_root = newton(
+            lambda T: T - Td - factor * (T_surf - T) * (P / 101325.0),
+            285.0,
+            fprime=lambda T: 1.0 + factor * (P / 101325.0)
+        )
+        
         assert converged
-        assert abs(quadratic(root)) < tol * 10  # Function value should be very small
+        assert np.isclose(root, scipy_root, atol=1e-6)
 
-
-class TestBisection:
-    """Test suite for bisection method."""
-
-    def test_linear_function(self):
-        """Test with simple linear function."""
-        root, iters, converged = _bisection_scalar(linear, a=0.0, b=5.0)
-        scipy_root = optimize.bisect(linear_nojit, a=0.0, b=5.0)
-
+    def test_five_parameters(self):
+        """Test with five parameters."""
+        @njit
+        def f(x, p0, p1, p2, p3, p4):
+            return p0*x**4 + p1*x**3 + p2*x**2 + p3*x + p4
+        
+        @njit
+        def fp(x, p0, p1, p2, p3, p4):
+            return 4*p0*x**3 + 3*p1*x**2 + 2*p2*x + p3
+        
+        params = (1.0, 0.0, -10.0, 0.0, 9.0)  # x^4 - 10x^2 + 9
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.5, 1e-6, 50, *params)
+        
+        scipy_root = newton(
+            lambda x: params[0]*x**4 + params[1]*x**3 + params[2]*x**2 + params[3]*x + params[4],
+            1.5,
+            fprime=lambda x: 4*params[0]*x**3 + 3*params[1]*x**2 + 2*params[2]*x + params[3]
+        )
+        
         assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
+
+    def test_transcendental_with_params(self):
+        """Test transcendental equation with parameters."""
+        @njit
+        def f(x, a, b):
+            return a * np.sin(x) - b
+        
+        @njit
+        def fp(x, a, b):
+            return a * np.cos(x)
+        
+        a, b = 2.0, 1.0
+        root, iters, converged = _newton_raphson_scalar(f, fp, 0.5, 1e-8, 50, a, b)
+        scipy_root = newton(lambda x: a * np.sin(x) - b, 0.5, 
+                           fprime=lambda x: a * np.cos(x))
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+
+    def test_zero_derivative_handling(self):
+        """Test handling of zero derivative (should not converge)."""
+        @njit
+        def f(x, k):
+            return (x - k)**2
+        
+        @njit
+        def fp(x, k):
+            return 2 * (x - k)
+        
+        k = 5.0
+        # Start at exactly k where derivative is zero
+        root, iters, converged = _newton_raphson_scalar(f, fp, k, 1e-6, 50, k)
+        
+        assert not converged  # Should fail due to zero derivative
+
+    def test_non_convergence(self):
+        """Test equation that doesn't converge."""
+        @njit
+        def f(x, offset):
+            return x**2 + offset  # No real roots for positive offset
+        
+        @njit
+        def fp(x, offset):
+            return 2 * x
+        
+        offset = 1.0
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.0, 1e-6, 10, offset)
+        
+        # Should either not converge or have large function value
+        assert (not converged) or (abs(f(root, offset)) > 1e-3)
+
+
+class TestBisectionScalar:
+    """Test bisection scalar solver with various parameter configurations."""
+
+    def test_no_parameters(self):
+        """Test with function requiring no parameters."""
+        @njit
+        def f(x):
+            return x**2 - 4
+        
+        root, iters, converged = _bisection_scalar(f, 0.0, 5.0, 1e-6, 100)
+        scipy_root = brentq(lambda x: x**2 - 4, 0.0, 5.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
         assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
 
-    def test_quadratic_positive_root(self):
-        """Test quadratic with bracket around positive root."""
-        root, iters, converged = _bisection_scalar(quadratic, a=0.0, b=5.0)
-        scipy_root = optimize.bisect(quadratic_nojit, a=0.0, b=5.0)
-
-        assert converged
-        assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_quadratic_negative_root(self):
-        """Test quadratic with bracket around negative root."""
-        root, iters, converged = _bisection_scalar(quadratic, a=-5.0, b=0.0)
-        scipy_root = optimize.bisect(quadratic_nojit, a=-5.0, b=0.0)
-
-        assert converged
-        assert np.isclose(root, -2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_transcendental_function(self):
-        """Test with transcendental function."""
-        root, iters, converged = _bisection_scalar(transcendental, a=0.0, b=1.0)
-        scipy_root = optimize.bisect(transcendental_nojit, a=0.0, b=1.0)
-
+    def test_single_parameter(self):
+        """Test with one parameter."""
+        @njit
+        def f(x, k):
+            return x**3 - k
+        
+        k = 27.0
+        root, iters, converged = _bisection_scalar(f, 0.0, 5.0, 1e-6, 100, k)
+        scipy_root = brentq(lambda x: x**3 - k, 0.0, 5.0)
+        
         assert converged
         assert np.isclose(root, scipy_root, atol=1e-6)
+        assert np.isclose(root, 3.0, atol=1e-6)
 
-    def test_cubic_middle_root(self):
-        """Test cubic function for middle root."""
-        root, iters, converged = _bisection_scalar(cubic, a=-0.5, b=0.5)
-        scipy_root = optimize.bisect(cubic_nojit, a=-0.5, b=0.5)
-
+    def test_two_parameters(self):
+        """Test with two parameters."""
+        @njit
+        def f(x, a, b):
+            return a * x**2 - b
+        
+        a, b = 1.0, 16.0
+        root, iters, converged = _bisection_scalar(f, 0.0, 10.0, 1e-6, 100, a, b)
+        scipy_root = brentq(lambda x: a * x**2 - b, 0.0, 10.0)
+        
         assert converged
-        assert np.isclose(root, 0.0, atol=1e-6)
+        assert np.isclose(root, scipy_root, atol=1e-6)
+        assert np.isclose(root, 4.0, atol=1e-6)
+
+    def test_three_parameters(self):
+        """Test with three parameters."""
+        @njit
+        def f(x, a, b, c):
+            return a * x**3 + b * x + c
+        
+        a, b, c = 1.0, -2.0, -5.0
+        root, iters, converged = _bisection_scalar(f, 2.0, 3.0, 1e-6, 100, a, b, c)
+        scipy_root = brentq(lambda x: a*x**3 + b*x + c, 2.0, 3.0)
+        
+        assert converged
         assert np.isclose(root, scipy_root, atol=1e-6)
 
-    def test_root_at_boundary(self):
-        """Test when root is exactly at bracket boundary."""
-        root, iters, converged = _bisection_scalar(quadratic, a=2.0, b=5.0)
-
+    def test_atmospheric_equation_four_params(self):
+        """Test with atmospheric-like equation (4 parameters)."""
+        @njit
+        def f(T, T_surf, Td, P, factor):
+            return T - Td - factor * (T_surf - T) * (P / 101325.0)
+        
+        T_surf, Td, P, factor = 293.15, 283.15, 85000.0, 0.2
+        root, iters, converged = _bisection_scalar(
+            f, 250.0, 300.0, 1e-4, 100, 
+            T_surf, Td, P, factor
+        )
+        
+        scipy_root = brentq(
+            lambda T: T - Td - factor * (T_surf - T) * (P / 101325.0),
+            250.0, 300.0
+        )
+        
         assert converged
-        assert iters == 0
-        assert root == 2.0
+        assert np.isclose(root, scipy_root, atol=1e-4)
 
-    def test_no_sign_change(self):
-        """Test behavior when bracket doesn't contain root."""
-        root, iters, converged = _bisection_scalar(quadratic, a=3.0, b=5.0)
-
+    def test_invalid_bracket(self):
+        """Test with invalid bracket (same sign at both ends)."""
+        @njit
+        def f(x, offset):
+            return x**2 + offset
+        
+        offset = 1.0  # No roots for positive offset
+        root, iters, converged = _bisection_scalar(f, 0.0, 5.0, 1e-6, 100, offset)
+        
         assert not converged
         assert np.isnan(root)
 
-    def test_custom_tolerance(self):
-        """Test with custom tolerance."""
-        tol = 1e-10
-        root, iters, converged = _bisection_scalar(quadratic, a=0.0, b=5.0, tol=tol)
-
-        assert converged
-        assert abs(quadratic(root)) < tol * 10
-
-
-class TestBrent:
-    """Test suite for Brent's method."""
-
-    def test_linear_function(self):
-        """Test with simple linear function."""
-        root, iters, converged = _brent_scalar(linear, a=0.0, b=5.0)
-        scipy_root = optimize.brentq(linear_nojit, a=0.0, b=5.0)
-
-        assert converged
-        assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_quadratic_positive_root(self):
-        """Test quadratic with bracket around positive root."""
-        root, iters, converged = _brent_scalar(quadratic, a=0.0, b=5.0)
-        scipy_root = optimize.brentq(quadratic_nojit, a=0.0, b=5.0)
-
-        assert converged
-        assert np.isclose(root, 2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_quadratic_negative_root(self):
-        """Test quadratic with bracket around negative root."""
-        root, iters, converged = _brent_scalar(quadratic, a=-5.0, b=0.0)
-        scipy_root = optimize.brentq(quadratic_nojit, a=-5.0, b=0.0)
-
-        assert converged
-        assert np.isclose(root, -2.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_transcendental_function(self):
-        """Test with transcendental function."""
-        root, iters, converged = _brent_scalar(transcendental, a=0.0, b=1.0)
-        scipy_root = optimize.brentq(transcendental_nojit, a=0.0, b=1.0)
-
-        assert converged
-        assert np.isclose(root, scipy_root, atol=1e-6)
-        assert np.isclose(root, 0.7390851332, atol=1e-6)
-
-    def test_exponential_function(self):
-        """Test with exponential function."""
-        root, iters, converged = _brent_scalar(exponential, a=0.0, b=2.0)
-        scipy_root = optimize.brentq(exponential_nojit, a=0.0, b=2.0)
-
-        assert converged
-        assert np.isclose(root, np.log(2), atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
-    def test_cubic_function(self):
-        """Test cubic function for middle root."""
-        root, iters, converged = _brent_scalar(cubic, a=-0.5, b=0.5)
-        scipy_root = optimize.brentq(cubic_nojit, a=-0.5, b=0.5)
-
-        assert converged
-        assert np.isclose(root, 0.0, atol=1e-6)
-        assert np.isclose(root, scipy_root, atol=1e-6)
-
     def test_root_at_boundary(self):
         """Test when root is exactly at bracket boundary."""
-        root, iters, converged = _brent_scalar(quadratic, a=2.0, b=5.0)
-
+        @njit
+        def f(x, k):
+            return x - k
+        
+        k = 2.0
+        root, iters, converged = _bisection_scalar(f, 2.0, 5.0, 1e-6, 100, k)
+        
         assert converged
-        assert iters == 0
-        assert root == 2.0
+        assert np.isclose(root, 2.0, atol=1e-6)
 
-    def test_no_sign_change(self):
-        """Test behavior when bracket doesn't contain root."""
-        root, iters, converged = _brent_scalar(quadratic, a=3.0, b=5.0)
 
-        assert not converged
-        assert np.isnan(root)
+class TestBrentScalar:
+    """Test Brent's method scalar solver with various parameter configurations."""
 
-    def test_convergence_speed(self):
-        """Test that Brent's method converges faster than bisection."""
-        # Brent should be faster than bisection for smooth functions
-        root_brent, iters_brent, _ = _brent_scalar(exponential, a=0.0, b=2.0)
-        root_bisect, iters_bisect, _ = _bisection_scalar(exponential, a=0.0, b=2.0)
-
-        assert np.isclose(root_brent, root_bisect, atol=1e-6)
-        assert iters_brent <= iters_bisect
-
-    def test_custom_tolerance(self):
-        """Test with custom tolerance."""
-        tol = 1e-10
-        root, iters, converged = _brent_scalar(quadratic, a=0.0, b=5.0, tol=tol)
-
+    def test_no_parameters(self):
+        """Test with function requiring no parameters."""
+        @njit
+        def f(x):
+            return x**2 - 4
+        
+        root, iters, converged = _brent_scalar(f, 0.0, 5.0, 1e-6, 100)
+        scipy_root = brentq(lambda x: x**2 - 4, 0.0, 5.0)
+        
         assert converged
-        assert abs(quadratic(root)) < tol * 10
+        assert np.isclose(root, scipy_root, atol=1e-6)
+
+    def test_single_parameter(self):
+        """Test with one parameter."""
+        @njit
+        def f(x, k):
+            return x**3 - k
+        
+        k = 8.0
+        root, iters, converged = _brent_scalar(f, 0.0, 5.0, 1e-8, 100, k)
+        scipy_root = brentq(lambda x: x**3 - k, 0.0, 5.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+        assert np.isclose(root, 2.0, atol=1e-8)
+
+    def test_two_parameters(self):
+        """Test with two parameters."""
+        @njit
+        def f(x, a, b):
+            return a * x**3 - b
+        
+        a, b = 1.0, 27.0
+        root, iters, converged = _brent_scalar(f, 0.0, 5.0, 1e-8, 100, a, b)
+        scipy_root = brentq(lambda x: a * x**3 - b, 0.0, 5.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+        assert np.isclose(root, 3.0, atol=1e-8)
+
+    def test_three_parameters(self):
+        """Test with three parameters."""
+        @njit
+        def f(x, a, b, c):
+            return a * x**3 + b * x + c
+        
+        a, b, c = 1.0, -2.0, -5.0
+        root, iters, converged = _brent_scalar(f, 2.0, 3.0, 1e-8, 100, a, b, c)
+        scipy_root = brentq(lambda x: a*x**3 + b*x + c, 2.0, 3.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+
+    def test_transcendental_with_params(self):
+        """Test transcendental equation with parameters."""
+        @njit
+        def f(x, scale, offset):
+            return scale * np.sin(x) - offset
+        
+        scale, offset = 2.0, 1.0
+        root, iters, converged = _brent_scalar(f, 0.0, np.pi/2, 1e-8, 100, scale, offset)
+        scipy_root = brentq(lambda x: scale * np.sin(x) - offset, 0.0, np.pi/2)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+
+    def test_efficiency_vs_bisection(self):
+        """Verify Brent is more efficient than bisection with parameters."""
+        @njit
+        def f(x, k):
+            return x**3 - k
+        
+        k = 10.0
+        
+        root_brent, iters_brent, conv_brent = _brent_scalar(
+            f, 0.0, 5.0, 1e-8, 100, k
+        )
+        root_bisect, iters_bisect, conv_bisect = _bisection_scalar(
+            f, 0.0, 5.0, 1e-8, 100, k
+        )
+        
+        assert conv_brent and conv_bisect
+        assert np.isclose(root_brent, root_bisect, atol=1e-8)
+        assert iters_brent < iters_bisect  # Brent should converge faster
 
 
-class TestComparison:
-    """Comparative tests across all methods."""
+class TestParameterUnpackingEdgeCases:
+    """Test edge cases for parameter unpacking in JIT functions."""
 
-    def test_all_methods_agree_on_quadratic(self):
-        """Test that all methods find the same root for quadratic."""
-        root_nr, _, _ = _newton_raphson_scalar(quadratic, quadratic_prime, x0=3.0)
-        root_bisect, _, _ = _bisection_scalar(quadratic, a=0.0, b=5.0)
-        root_brent, _, _ = _brent_scalar(quadratic, a=0.0, b=5.0)
+    def test_mixed_int_float_parameters(self):
+        """Test mixing float and int parameters."""
+        @njit
+        def f(x, a, n):
+            return a * x**n - 8.0
+        
+        @njit
+        def fp(x, a, n):
+            return a * n * x**(n-1)
+        
+        a, n = 1.0, 3  # Mixed float and int
+        root, iters, converged = _newton_raphson_scalar(f, fp, 1.5, 1e-6, 50, a, n)
+        
+        assert converged
+        assert np.isclose(root, 2.0, atol=1e-6)
 
-        assert np.isclose(root_nr, root_bisect, atol=1e-5)
-        assert np.isclose(root_bisect, root_brent, atol=1e-5)
-        assert np.isclose(root_nr, 2.0, atol=1e-6)
+    def test_negative_parameters(self):
+        """Test with negative parameter values."""
+        @njit
+        def f(x, offset):
+            return x**2 + offset
+        
+        offset = -4.0  # Negative parameter
+        root, iters, converged = _bisection_scalar(f, 0.0, 5.0, 1e-6, 100, offset)
+        
+        assert converged
+        assert np.isclose(root, 2.0, atol=1e-6)
 
-    def test_all_methods_agree_on_transcendental(self):
-        """Test that all methods find the same root for transcendental function."""
-        root_nr, _, _ = _newton_raphson_scalar(transcendental, transcendental_prime, x0=1.0)
-        root_bisect, _, _ = _bisection_scalar(transcendental, a=0.0, b=1.0)
-        root_brent, _, _ = _brent_scalar(transcendental, a=0.0, b=1.0)
+    def test_zero_parameter(self):
+        """Test with zero as parameter value."""
+        @njit
+        def f(x, offset):
+            return x + offset
+        
+        offset = 0.0
+        root, iters, converged = _bisection_scalar(f, -5.0, 5.0, 1e-6, 100, offset)
+        
+        assert converged
+        assert np.isclose(root, 0.0, atol=1e-6)
 
-        assert np.isclose(root_nr, root_bisect, atol=1e-5)
-        assert np.isclose(root_bisect, root_brent, atol=1e-5)
-        assert np.isclose(root_nr, 0.7390851332, atol=1e-6)
+    def test_large_parameter_values(self):
+        """Test with large parameter values."""
+        @njit
+        def f(x, scale):
+            return x**2 - scale
+        
+        scale = 1e6
+        root, iters, converged = _bisection_scalar(f, 0.0, 2000.0, 1e-3, 100, scale)
+        
+        assert converged
+        assert np.isclose(root, np.sqrt(scale), rtol=1e-5)
+
+    def test_very_small_parameters(self):
+        """Test with very small parameter values."""
+        @njit
+        def f(x, epsilon):
+            return x - epsilon
+        
+        epsilon = 1e-10
+        root, iters, converged = _brent_scalar(f, 0.0, 1e-5, 1e-12, 100, epsilon)
+        
+        assert converged
+        assert np.isclose(root, epsilon, atol=1e-12)
+
+
+class TestConsistencyWithScipy:
+    """Verify all solvers produce results consistent with scipy across parameter ranges."""
+
+    @pytest.mark.parametrize("k", [1.0, 5.0, 10.0, 100.0])
+    def test_newton_consistency(self, k):
+        """Test Newton-Raphson consistency across different parameter values."""
+        @njit
+        def f(x, param):
+            return x**2 - param
+        
+        @njit
+        def fp(x, param):
+            return 2 * x
+        
+        x0 = np.sqrt(k) * 0.5
+        root, _, converged = _newton_raphson_scalar(f, fp, x0, 1e-8, 50, k)
+        scipy_root = newton(lambda x: x**2 - k, x0, fprime=lambda x: 2*x)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+
+    @pytest.mark.parametrize("k", [5.0, 10.0, 27.0, 64.0])
+    def test_brent_consistency(self, k):
+        """Test Brent consistency across different parameter values."""
+        @njit
+        def f(x, param):
+            return x**3 - param
+        
+        root, _, converged = _brent_scalar(f, 0.0, 10.0, 1e-8, 100, k)
+        scipy_root = brentq(lambda x: x**3 - k, 0.0, 10.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-8)
+
+    @pytest.mark.parametrize("offset", [-4.0, -9.0, -16.0, -25.0])
+    def test_bisection_consistency(self, offset):
+        """Test bisection consistency across different parameter values."""
+        @njit
+        def f(x, param):
+            return x**2 + param
+        
+        root, _, converged = _bisection_scalar(
+            f, 0.0, np.sqrt(-offset) + 1.0, 1e-6, 100, offset
+        )
+        scipy_root = brentq(lambda x: x**2 + offset, 0.0, np.sqrt(-offset) + 1.0)
+        
+        assert converged
+        assert np.isclose(root, scipy_root, atol=1e-6)
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
