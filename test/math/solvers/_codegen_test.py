@@ -126,16 +126,23 @@ class TestCodegenOpenMethods:
             [1.0, 0.0, -10.0, 0.0, 9.0],
             [1.0, 0.0, -10.0, 0.0, 9.0],
         ])
-        x0 = np.array([0.5, 1.5, 2.5])  # Different starting points
+        x0 = np.array([0.5, 1.5, 2.5])
         
         roots, iters, converged = solver(f, fp, params, x0, 1e-6, 50)
         
+        # Compare with scipy - whatever scipy gets, we should get
+        expected = np.array([
+            newton(lambda x: params[i,0]*x**4 + params[i,1]*x**3 + params[i,2]*x**2 + 
+                            params[i,3]*x + params[i,4],
+                x0[i],
+                fprime=lambda x: 4*params[i,0]*x**3 + 3*params[i,1]*x**2 + 
+                                2*params[i,2]*x + params[i,3])
+            for i in range(len(params))
+        ])
+        
         assert np.all(converged)
-        # Should converge to different roots based on starting point
-        assert roots[0] < 1.5  # Converges to x ≈ 1
-        assert 1.5 < roots[1] < 2.5  # Converges to x ≈ 3
-        assert roots[2] > 2.5  # Converges to x ≈ 3
-
+        assert np.allclose(roots, expected, atol=1e-6)
+        
     def test_large_array(self):
         """Test codegen with large array (performance test)."""
         @njit
