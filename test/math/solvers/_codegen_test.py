@@ -142,7 +142,7 @@ class TestCodegenOpenMethods:
         
         assert np.all(converged)
         assert np.allclose(roots, expected, atol=1e-6)
-        
+
     def test_large_array(self):
         """Test codegen with large array (performance test)."""
         @njit
@@ -222,14 +222,18 @@ class TestCodegenBracketMethods:
             [1.0, -3.0, -8.0],
             [1.0, -1.0, -2.0],
         ])
-        a_vals = np.ones(3) * 2.0
-        b_vals = np.ones(3) * 3.0
         
+        # Use brackets that work for all three
+        a_vals = np.array([1.5, 2.0, 1.0])
+        b_vals = np.array([2.5, 3.0, 2.0])
+        
+        # Solve with your codegen solver
         roots, iters, converged = solver(f, params, a_vals, b_vals, 1e-8, 100)
         
+        # Get expected from scipy with SAME inputs
         expected = np.array([
-            brentq(lambda x: params[i,0]*x**3 + params[i,1]*x + params[i,2], 
-                  a_vals[i], b_vals[i])
+            brentq(lambda x: params[i,0]*x**3 + params[i,1]*x + params[i,2],
+                a_vals[i], b_vals[i])
             for i in range(len(params))
         ])
         
