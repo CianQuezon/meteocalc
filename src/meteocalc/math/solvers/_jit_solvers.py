@@ -4,7 +4,7 @@ Root finding solvers with using Numba JIT compilation.
 Author: Cian Quezon
 """
 
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 
 import numpy as np
 import numpy.typing as npt
@@ -18,6 +18,7 @@ def _newton_raphson_scalar(
     x0: float,
     tol: float = 1e-6,
     max_iter: int = 50,
+    *args
 ) -> Tuple[float, int, bool]:
     """
     Newton raphson for root finding.
@@ -35,8 +36,8 @@ def _newton_raphson_scalar(
     x = x0
 
     for i in range(max_iter):
-        fx = func(x)
-        fpx = func_prime(x)
+        fx = func(x, *args)
+        fpx = func_prime(x, *args)
 
         if abs(fpx) < 1e-15:
             return x, i, False
@@ -49,6 +50,7 @@ def _newton_raphson_scalar(
         x = x_new
 
     return x, max_iter, False
+
 
 
 @njit(parallel=True)
@@ -90,7 +92,8 @@ def _newton_raphson_vectorised(
 
 @njit
 def _bisection_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100
+    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
+    *args
 ) -> Tuple[float, int, bool]:
     """
     Scalar bisection to find roots.
@@ -106,8 +109,8 @@ def _bisection_scalar(
         - (root, iterations, converged)
 
     """
-    fa = func(a)
-    fb = func(b)
+    fa = func(a, *args)
+    fb = func(b, *args)
 
     if fa == 0.0:
         return a, 0, True
@@ -123,7 +126,7 @@ def _bisection_scalar(
 
     for i in range(max_iter):
         c = (a + b) / 2.0
-        fc = func(c)
+        fc = func(c, *args)
 
         if abs(fc) < tol or abs(b - a) / 2.0 < tol:
             return c, i + 1, True
@@ -177,7 +180,8 @@ def _bisection_vectorised(
 
 @njit
 def _brent_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100
+    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
+    *args
 ) -> Tuple[float, int, bool]:
     """
     Brent's method to find roots.
@@ -193,8 +197,8 @@ def _brent_scalar(
         - (root, iterations, converged)
 
     """
-    fa = func(a)
-    fb = func(b)
+    fa = func(a, *args)
+    fb = func(b, *args)
 
     if fa == 0.0:
         return a, 0, True
@@ -241,7 +245,7 @@ def _brent_scalar(
         else:
             mflag = False
 
-        fs = func(s)
+        fs = func(s, *args)
 
         d = c
         c = b
