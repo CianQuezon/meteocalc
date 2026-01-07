@@ -31,9 +31,16 @@ def generate_vectorised_solver(scalar_func: Callable[[float], float], num_params
 
     method_type = parse_enum(method_type, MethodType)
 
-    param_names = ', '.join([f'p{i}' for i in range(num_params)])
-    param_extracts = ', '.join([f'func_params[:, {i}]' for i in range(num_params)])
-    param_indices = ', '.join([f'p{i}[i]' for i in range(num_params)])
+    if num_params > 0:
+        param_names = ', '.join([f'p{i}' for i in range(num_params)])
+        param_extracts = ', '.join([f'func_params[:, {i}]' for i in range(num_params)])
+        param_indices = ', '.join([f'p{i}[i]' for i in range(num_params)])
+        param_declaration = f"{param_names} = {param_extracts}"
+        param_call = f", {param_indices}"
+
+    else:
+        param_declaration = ""
+        param_call = ""
 
     if method_type == MethodType.OPEN:
         code = f"""
@@ -46,12 +53,12 @@ def _open_solver_generated(func, func_prime, func_params, x0, tol, max_iter):
     iterations_arr = np.empty(n, dtype=np.int64)
     converged_flag_arr = np.empty(n, dtype=np.bool_)
 
-    {param_names} = {param_extracts}
+    {param_declaration}
 
     for i in prange(n):
         root, iteration, converged_flag = {scalar_name}(
-            func, func_prime, x0[i], tol, max_iter,
-            {param_indices}
+            func, func_prime, x0[i], tol, max_iter
+            {param_call}
         )
         root_arr[i] = root
         iterations_arr[i] = iteration
@@ -72,12 +79,12 @@ def _bracket_solver_generated(func, func_params, a, b, tol, max_iter):
     iterations_arr = np.empty(n, dtype=np.int64)
     converged_flag_arr = np.empty(n, dtype=np.bool_)
 
-    {param_names} = {param_extracts}
+    {param_declaration}
 
     for i in prange(n):
         root, iteration, converged_flag = {scalar_name}(
-            func, a[i], b[i], tol, max_iter,
-            {param_indices}
+            func, a[i], b[i], tol, max_iter
+            {param_call}
         )
         root_arr[i] = root
         iterations_arr[i] = iteration
