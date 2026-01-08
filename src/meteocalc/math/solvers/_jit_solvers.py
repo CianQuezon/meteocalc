@@ -77,9 +77,14 @@ def _newton_raphson_vectorised(
     func_params = np.asarray(func_params, dtype=np.float64)
 
     if func_params.ndim == 1:
-        func_params = func_params.reshape(1, -1)
+        n_solves = len(func_params)
+        num_params = 1
+        
+        func_params = func_params.reshape(n_solves, -1)
 
-    num_params = func_params.shape[1]
+    else:
+        n_solves = func_params.shape[0]
+        num_params = func_params.shape[1]
 
     solver = generate_vectorised_solver(
         scalar_func=_newton_raphson_scalar,
