@@ -4,12 +4,13 @@ Root finding solvers with using Numba JIT compilation.
 Author: Cian Quezon
 """
 
-from typing import Callable, Tuple, List
-
 import numpy as np
 import numpy.typing as npt
-from numba import njit, prange
 
+from numba import njit, prange
+from meteorological_equations.math.solvers._codegen import generate_vectorised_solver
+from typing import Callable, Tuple, List
+from meteorological_equations.math.solvers._enums import MethodType
 
 @njit
 def _newton_raphson_scalar(
@@ -57,6 +58,7 @@ def _newton_raphson_scalar(
 def _newton_raphson_vectorised(
     func: Callable[[float], float],
     func_prime: Callable[[float], float],
+    func_params: npt.ArrayLike,
     x0: npt.ArrayLike,
     tol: float = 1e-6,
     max_iter: int = 50,
@@ -74,21 +76,20 @@ def _newton_raphson_vectorised(
     Returns:
         Array of (root, iterations, converged)
     """
-    n = len(x0)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    func_params = np.asarray(func_params, dtype=np.float64)
 
-    for i in prange(n):
-        root, iteration, converged = _newton_raphson_scalar(
-            func=func, func_prime=func_prime, x0=x0[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
+    if func_params.ndim == 1:
+        func_params = func_params.reshape(1, -1)
 
-    return root_arr, iterations_arr, converged_arr
+    num_params = func_params.shape[1]
 
+    solver = generate_vectorised_solver(
+        scalar_func=_newton_raphson_scalar,
+        num_params=num_params,
+        method_type=MethodType.OPEN
+    )
+
+    return solver(func, func_prime, func_params, x0, tol, max_iter)
 
 @njit
 def _bisection_scalar(
