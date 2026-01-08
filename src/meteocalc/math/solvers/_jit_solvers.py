@@ -19,7 +19,7 @@ def _newton_raphson_scalar(
     x0: float,
     tol: float = 1e-6,
     max_iter: int = 50,
-    *args
+    *func_params
 ) -> Tuple[float, int, bool]:
     """
     Newton raphson for root finding.
@@ -30,6 +30,7 @@ def _newton_raphson_scalar(
         x0(float) = Initial guess
         tol(float) = Tolerance for convergence
         max_iter(int) = Maximum iterations
+        func_params = function parameters of the function
 
     Returns:
         (root, iterations, converged)
@@ -37,8 +38,8 @@ def _newton_raphson_scalar(
     x = x0
 
     for i in range(max_iter):
-        fx = func(x, *args)
-        fpx = func_prime(x, *args)
+        fx = func(x, *func_params)
+        fpx = func_prime(x, *func_params)
 
         if abs(fpx) < 1e-15:
             return x, i, False
@@ -98,7 +99,7 @@ def _newton_raphson_vectorised(
 @njit
 def _bisection_scalar(
     func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
-    *args
+    *func_params
 ) -> Tuple[float, int, bool]:
     """
     Scalar bisection to find roots.
@@ -109,13 +110,14 @@ def _bisection_scalar(
         - b (float) = Upper bracket bound
         - tol (float) = Tolerance for convergence
         - max_iter(int) = Maximum iterations
+        - func_params = function parameters
 
     Returns:
         - (root, iterations, converged)
 
     """
-    fa = func(a, *args)
-    fb = func(b, *args)
+    fa = func(a, *func_params)
+    fb = func(b, *func_params)
 
     if fa == 0.0:
         return a, 0, True
@@ -131,7 +133,7 @@ def _bisection_scalar(
 
     for i in range(max_iter):
         c = (a + b) / 2.0
-        fc = func(c, *args)
+        fc = func(c, *func_params)
 
         if abs(fc) < tol or abs(b - a) / 2.0 < tol:
             return c, i + 1, True
@@ -145,7 +147,6 @@ def _bisection_scalar(
     return (a + b) / 2.0, max_iter, False
 
 
-@njit(parallel=True)
 def _bisection_vectorised(
     func: Callable[[float], float],
     func_params: npt.ArrayLike,
@@ -192,7 +193,7 @@ def _bisection_vectorised(
 @njit
 def _brent_scalar(
     func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
-    *args
+    *func_params
 ) -> Tuple[float, int, bool]:
     """
     Brent's method to find roots.
@@ -203,13 +204,14 @@ def _brent_scalar(
         - b (float) = Upper bracket bound
         - tol (float) = Tolerance for convergence
         - max_iter (int) = maximum iterations
+        - func_params = function parameters for the function
 
     Returns:
         - (root, iterations, converged)
 
     """
-    fa = func(a, *args)
-    fb = func(b, *args)
+    fa = func(a, *func_params)
+    fb = func(b, *func_params)
 
     if fa == 0.0:
         return a, 0, True
@@ -256,7 +258,7 @@ def _brent_scalar(
         else:
             mflag = False
 
-        fs = func(s, *args)
+        fs = func(s, *func_params)
 
         d = c
         c = b
