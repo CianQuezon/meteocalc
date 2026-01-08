@@ -67,6 +67,7 @@ def _newton_raphson_vectorised(
     Args:
         - func(Callable[[float], float]) = function required to solve the root
         - func_prime(Callable[[float], float]) = derivative of the function
+        - func_params(npt.ArrayLike) = an array of function parameters 
         - x0(npt.ArrayLike) = Array of initial guesses
         - tol (float) = Convergence tolerance
         - max_iter(int) = maximum amount of iterations
@@ -147,6 +148,7 @@ def _bisection_scalar(
 @njit(parallel=True)
 def _bisection_vectorised(
     func: Callable[[float], float],
+    func_params: npt.ArrayLike,
     a: npt.ArrayLike,
     b: npt.ArrayLike,
     tol: float = 1e-6,
@@ -156,7 +158,8 @@ def _bisection_vectorised(
     Vectorised version bisection method for arrays.
 
     Args:
-        - func: Callable[[float], float] = Function to solve for the root
+        - func (Callable[[float], float]) = Function to solve for the root
+        - func_params (npt.ArrayLike) = An array of function parameters
         - a (npt.NDArray) = Upper bracket bound
         - b (npt.NDArray) = Lower bracket bound
         - tol (float) = Convergence tolerance
@@ -165,21 +168,25 @@ def _bisection_vectorised(
     Returns:
         - Array of roots in (root, iterations, converged)
     """
+    func_params = np.asarray(func_params, dtype=np.float64)
 
-    n = len(a)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    if func_params.ndim == 1:
+        n_solves = len(func_params)
+        num_params = 1
 
-    for i in prange(n):
-        root, iteration, converged = _bisection_scalar(
-            func=func, a=a[i], b=b[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
+        func_params = func_params.reshape(n_solves, -1)
+    
+    else:
+        n_solves = func_params.shape[0]
+        num_params = func_params.shape[1]
+    
+    solver = generate_vectorised_solver(scalar_func=_bisection_scalar,
+                                        num_params=num_params,
+                                        method_type=MethodType.BRACKET)
+    
+    return solver(func, func_params, a, b, tol, max_iter)
 
-    return root_arr, iterations_arr, converged_arr
+    
 
 
 @njit
