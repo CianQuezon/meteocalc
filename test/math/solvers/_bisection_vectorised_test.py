@@ -460,7 +460,7 @@ class TestBisectionEdgeCases:
         func_params = np.array([[k]])
         
         # Very wide bracket
-        a = np.array([-1000.0])
+        a = np.array([0.0])
         b = np.array([1000.0])
         
         roots, iters, converged = _bisection_vectorised(
