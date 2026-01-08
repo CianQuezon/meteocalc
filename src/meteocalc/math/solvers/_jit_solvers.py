@@ -53,8 +53,6 @@ def _newton_raphson_scalar(
     return x, max_iter, False
 
 
-
-@njit(parallel=True)
 def _newton_raphson_vectorised(
     func: Callable[[float], float],
     func_prime: Callable[[float], float],
