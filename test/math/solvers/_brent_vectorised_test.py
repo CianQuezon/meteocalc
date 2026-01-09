@@ -289,12 +289,12 @@ class TestBrentVectorised:
         )
 
         # Check expected convergence pattern
-        assert converged[0]        # offset = -4 (has root)
-        assert not converged[1]    # offset = 1 (no root)
-        assert converged[2]        # offset = -9 (has root)
-        assert not converged[3]    # offset = 5 (no root)
-        assert converged[4]        # offset = -16 (has root)
-        assert converged[5]        # offset = -25 (has root)
+        assert converged[0]  # offset = -4 (has root)
+        assert not converged[1]  # offset = 1 (no root)
+        assert converged[2]  # offset = -9 (has root)
+        assert not converged[3]  # offset = 5 (no root)
+        assert converged[4]  # offset = -16 (has root)
+        assert converged[5]  # offset = -25 (has root)
 
         # Check converged roots
         assert np.isclose(roots[0], 2.0, atol=1e-8)
