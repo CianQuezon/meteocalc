@@ -278,9 +278,9 @@ def _brent_scalar(
     return b, max_iter, False
 
 
-@njit(parallel=True)
 def _brent_vectorised(
     func: Callable[[float], float],
+    func_params: npt.ArrayLike,
     a: npt.ArrayLike,
     b: npt.ArrayLike,
     tol: float = 1e-6,
@@ -291,6 +291,7 @@ def _brent_vectorised(
 
     Args:
         - func: Callable[[float], float] = Function to solve for the root
+        - func_params (npt.ArrayLike) = An array of function parameters
         - a (npt.NDArray) = Upper bracket bound
         - b (npt.NDArray) = Lower bracket bound
         - tol (float) = Convergence tolerance
@@ -300,16 +301,20 @@ def _brent_vectorised(
         - Array of roots in (root, iterations, converged)
     """
 
-    n = len(a)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    func_params = np.asarray(func_params, dtype=np.float64)
 
-    for i in prange(n):
-        root, iteration, converged = _brent_scalar(
-            func=func, a=a[i], b=b[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
-    return root_arr, iterations_arr, converged_arr
+    if func_params.ndim == 1:
+        n_solves = len(func_params)
+        num_params = 1
+
+        func_params = func_params.reshape(n_solves, -1)
+    else:
+        n_solves = func_params.shape[0]
+        num_params = func_params.shape[1]
+    
+    solver = generate_vectorised_solver(
+        scalar_func=_brent_scalar, num_params=num_params,
+        method_type=MethodType.BRACKET
+    )
+
+    return solver(func, func_params, a, b, tol, max_iter)
