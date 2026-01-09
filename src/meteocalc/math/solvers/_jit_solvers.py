@@ -12,6 +12,7 @@ from meteorological_equations.math.solvers._codegen import generate_vectorised_s
 from typing import Callable, Tuple, List, Optional
 from meteorological_equations.math.solvers._enums import MethodType
 
+
 @njit
 def _newton_raphson_scalar(
     func: Callable[[float], float],
@@ -19,7 +20,7 @@ def _newton_raphson_scalar(
     x0: float,
     tol: float = 1e-6,
     max_iter: int = 50,
-    *func_params
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Newton raphson for root finding.
@@ -68,7 +69,7 @@ def _newton_raphson_vectorised(
     Args:
         - func(Callable[[float], float]) = function required to solve the root
         - func_prime(Callable[[float], float]) = derivative of the function
-        - func_params(npt.ArrayLike) = an array of function parameters 
+        - func_params(npt.ArrayLike) = an array of function parameters
         - x0(npt.ArrayLike) = Array of initial guesses
         - tol (float) = Convergence tolerance
         - max_iter(int) = maximum amount of iterations
@@ -80,22 +81,24 @@ def _newton_raphson_vectorised(
     n_solves = len(x0)
 
     func_params, num_params = _validate_and_prepare_params(
-        func_params=func_params,
-        n_solves=n_solves
+        func_params=func_params, n_solves=n_solves
     )
 
     solver = generate_vectorised_solver(
-        scalar_func=_newton_raphson_scalar,
-        num_params=num_params,
-        method_type=MethodType.OPEN
+        scalar_func=_newton_raphson_scalar, num_params=num_params, method_type=MethodType.OPEN
     )
 
     return solver(func, func_prime, func_params, x0, tol, max_iter)
 
+
 @njit
 def _bisection_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
-    *func_params
+    func: Callable[[float], float],
+    a: float,
+    b: float,
+    tol: float = 1e-6,
+    max_iter: int = 100,
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Scalar bisection to find roots.
@@ -169,23 +172,24 @@ def _bisection_vectorised(
     n_solves = len(a)
 
     func_params, num_params = _validate_and_prepare_params(
-        func_params=func_params,
-        n_solves=n_solves
+        func_params=func_params, n_solves=n_solves
     )
-    
-    solver = generate_vectorised_solver(scalar_func=_bisection_scalar,
-                                        num_params=num_params,
-                                        method_type=MethodType.BRACKET)
-    
-    return solver(func, func_params, a, b, tol, max_iter)
 
-    
+    solver = generate_vectorised_solver(
+        scalar_func=_bisection_scalar, num_params=num_params, method_type=MethodType.BRACKET
+    )
+
+    return solver(func, func_params, a, b, tol, max_iter)
 
 
 @njit
 def _brent_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100,
-    *func_params
+    func: Callable[[float], float],
+    a: float,
+    b: float,
+    tol: float = 1e-6,
+    max_iter: int = 100,
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Brent's method to find roots.
@@ -297,21 +301,19 @@ def _brent_vectorised(
     n_solves = len(a)
 
     func_params, num_params = _validate_and_prepare_params(
-        func_params=func_params,
-        n_solves=n_solves
+        func_params=func_params, n_solves=n_solves
     )
-    
+
     solver = generate_vectorised_solver(
-        scalar_func=_brent_scalar, num_params=num_params,
-        method_type=MethodType.BRACKET
+        scalar_func=_brent_scalar, num_params=num_params, method_type=MethodType.BRACKET
     )
 
     return solver(func, func_params, a, b, tol, max_iter)
 
 
 def _validate_and_prepare_params(
-        func_params: Optional[npt.ArrayLike],
-        n_solves: int,
+    func_params: Optional[npt.ArrayLike],
+    n_solves: int,
 ) -> Tuple[npt.NDArray[np.float64], int]:
     """
     Validates and prepares the function parameters for vectorised solvers
@@ -319,34 +321,29 @@ def _validate_and_prepare_params(
     Args:
         - func_params (npt.ArrayLike) = Array of function parameters or None for no parameters
         - n_solves (int) = Number of solves
-    
+
     Returns:
-        - (prepared_params, num_params) = Prepared function parameters and number of parameters 
+        - (prepared_params, num_params) = Prepared function parameters and number of parameters
     """
     if func_params is None:
         return np.empty((n_solves, 0), dtype=np.float64), 0
-    
+
     func_params = np.asarray(func_params, dtype=np.float64)
 
     if func_params.ndim == 1:
-
         if len(func_params) != n_solves:
             raise ValueError(
-                f"func_params length ({len(func_params)}) must match "
-                f"number of solves ({n_solves})"
+                f"func_params length ({len(func_params)}) must match number of solves ({n_solves})"
             )
         num_params = 1
         func_params = func_params.reshape(-1, 1)
-    
+
     else:
         if func_params.shape[0] != n_solves:
             raise ValueError(
-                f"func_params rows ({func_params.shape[0]}) must match"
-                f"number of solves ({n_solves})"
+                f"func_params rows ({func_params.shape[0]}) must matchnumber of solves ({n_solves})"
             )
-        
+
         num_params = func_params.shape[1]
 
-
-    
     return func_params, num_params
