@@ -577,7 +577,7 @@ class TestBrentEdgeCases:
         func_params = k_values.reshape(-1, 1)
         
         a = np.zeros(3)
-        b = np.ones(3) * 0.1
+        b = np.ones(3) + 0.1
         
         roots, iters, converged = _brent_vectorised(
             f, func_params, a, b, 1e-8, 100
