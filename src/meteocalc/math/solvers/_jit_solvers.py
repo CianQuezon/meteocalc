@@ -57,8 +57,8 @@ def _newton_raphson_scalar(
 def _newton_raphson_vectorised(
     func: Callable[[float], float],
     func_prime: Callable[[float], float],
-    func_params: npt.ArrayLike,
     x0: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 50,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -78,15 +78,12 @@ def _newton_raphson_vectorised(
     """
     func_params = np.asarray(func_params, dtype=np.float64)
 
-    if func_params.ndim == 1:
-        n_solves = len(func_params)
-        num_params = 1
-        
-        func_params = func_params.reshape(n_solves, -1)
+    n_solves = len(x0)
 
-    else:
-        n_solves = func_params.shape[0]
-        num_params = func_params.shape[1]
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params,
+        n_solves=n_solves
+    )
 
     solver = generate_vectorised_solver(
         scalar_func=_newton_raphson_scalar,
@@ -149,9 +146,9 @@ def _bisection_scalar(
 
 def _bisection_vectorised(
     func: Callable[[float], float],
-    func_params: npt.ArrayLike,
     a: npt.ArrayLike,
     b: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 100,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -171,15 +168,12 @@ def _bisection_vectorised(
     """
     func_params = np.asarray(func_params, dtype=np.float64)
 
-    if func_params.ndim == 1:
-        n_solves = len(func_params)
-        num_params = 1
+    n_solves = len(a)
 
-        func_params = func_params.reshape(n_solves, -1)
-    
-    else:
-        n_solves = func_params.shape[0]
-        num_params = func_params.shape[1]
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params,
+        n_solves=n_solves
+    )
     
     solver = generate_vectorised_solver(scalar_func=_bisection_scalar,
                                         num_params=num_params,
@@ -280,9 +274,9 @@ def _brent_scalar(
 
 def _brent_vectorised(
     func: Callable[[float], float],
-    func_params: npt.ArrayLike,
     a: npt.ArrayLike,
     b: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 100,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -301,16 +295,14 @@ def _brent_vectorised(
         - Array of roots in (root, iterations, converged)
     """
 
-    func_params = np.asarray(func_params, dtype=np.float64)
+    a = np.asarray(a, dtype=np.float64)
 
-    if func_params.ndim == 1:
-        n_solves = len(func_params)
-        num_params = 1
+    n_solves = len(a)
 
-        func_params = func_params.reshape(n_solves, -1)
-    else:
-        n_solves = func_params.shape[0]
-        num_params = func_params.shape[1]
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params,
+        n_solves=n_solves
+    )
     
     solver = generate_vectorised_solver(
         scalar_func=_brent_scalar, num_params=num_params,
