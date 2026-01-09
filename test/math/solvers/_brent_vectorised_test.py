@@ -18,18 +18,37 @@ class TestBrentVectorised:
     """Test vectorised Brent solver with codegen parameter handling."""
 
     def test_no_parameters_multiple_solves(self):
-        """Test multiple solves with no parameters."""
+        """Test multiple solves with no parameters (None)."""
 
         @njit
         def f(x):
             return x**2 - 4
 
-        # 100 solves, 0 parameters
-        func_params = np.empty((100, 0), dtype=np.float64)
+        # 100 solves, no parameters (None)
         a = np.zeros(100)
         b = np.ones(100) * 5.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=None, tol=1e-8, max_iter=100)
+
+        # Compare with scipy
+        expected = brentq(lambda x: x**2 - 4, 0.0, 5.0)
+
+        assert np.all(converged)
+        assert np.allclose(roots, expected, atol=1e-8)
+        assert np.allclose(roots, 2.0, atol=1e-8)
+
+    def test_no_parameters_omitted(self):
+        """Test multiple solves with no parameters (omitted)."""
+
+        @njit
+        def f(x):
+            return x**2 - 4
+
+        # 100 solves, no parameters (omitted)
+        a = np.zeros(100)
+        b = np.ones(100) * 5.0
+
+        roots, iters, converged = _brent_vectorised(f, a, b)  # func_params omitted
 
         # Compare with scipy
         expected = brentq(lambda x: x**2 - 4, 0.0, 5.0)
@@ -47,11 +66,10 @@ class TestBrentVectorised:
 
         # 50 solves, 1 parameter each
         k_values = np.array([8.0, 27.0, 64.0, 125.0, 216.0])
-        func_params = k_values.reshape(-1, 1)
         a = np.zeros(5)
         b = np.ones(5) * 10.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         # Compare with scipy
         expected = np.array([brentq(lambda x: x**3 - k, 0.0, 10.0) for k in k_values])
@@ -76,7 +94,7 @@ class TestBrentVectorised:
         a_bounds = np.zeros(n)
         b_bounds = np.cbrt(b_values) + 2.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a_bounds, b_bounds, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a_bounds, b_bounds, func_params=func_params, tol=1e-8, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -110,7 +128,7 @@ class TestBrentVectorised:
         a = np.array([1.0, 2.0, 3.0, 4.0])
         b = np.array([3.0, 4.0, 5.0, 6.0])
 
-        roots, iters, converged = _brent_vectorised(f, params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=params, tol=1e-8, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -144,7 +162,7 @@ class TestBrentVectorised:
         a = np.full(n, 250.0)
         b = np.full(n, 320.0)
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-6, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=func_params, tol=1e-6, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -186,7 +204,7 @@ class TestBrentVectorised:
         a = np.array([0.5, 0.5, 0.5])
         b = np.array([1.5, 1.5, 1.5])
 
-        roots, iters, converged = _brent_vectorised(f, params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=params, tol=1e-8, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -220,12 +238,11 @@ class TestBrentVectorised:
         # Large scale: 10,000 solves
         n = 10000
         k_values = np.linspace(1.0, 100.0, n)
-        func_params = k_values.reshape(-1, 1)
 
         a = np.zeros(n)
         b = np.sqrt(k_values) + 2.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         # All should converge
         assert np.all(converged)
@@ -243,12 +260,11 @@ class TestBrentVectorised:
 
         # Mix of valid (negative offset) and invalid (positive offset) cases
         offsets = np.array([-4.0, 1.0, -9.0, 5.0, -16.0, -25.0])
-        func_params = offsets.reshape(-1, 1)
 
         a = np.zeros(6)
         b = np.ones(6) * 6.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=offsets, tol=1e-8, max_iter=100)
 
         # Check expected convergence pattern
         assert converged[0] == True  # offset = -4 (has root)
@@ -274,13 +290,12 @@ class TestBrentVectorised:
             return x**3 - k
 
         k_values = np.array([8.0, 27.0, 64.0, 125.0])
-        func_params = k_values.reshape(-1, 1)
 
         # Different brackets for each
         a = np.array([1.0, 2.0, 3.0, 4.0])
         b = np.array([3.0, 4.0, 5.0, 6.0])
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         expected = np.cbrt(k_values)
 
@@ -295,13 +310,12 @@ class TestBrentVectorised:
             return x**3 - k
 
         k_values = np.array([8.0, 27.0, 64.0])
-        func_params = k_values.reshape(-1, 1)
 
         a = np.zeros(3)
         b = np.ones(3) * 5.0
 
         # Very tight tolerance
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-12, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-12, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, np.cbrt(k_values), atol=1e-12)
@@ -319,14 +333,7 @@ class TestBrentVectorised:
         a = np.zeros(5)
         b = np.ones(5) * 10.0
 
-        roots, iters, converged = _brent_vectorised(
-            f,
-            k_values,
-            a,
-            b,
-            1e-8,
-            100,  # Pass 1D array directly
-        )
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, np.cbrt(k_values), atol=1e-8)
@@ -345,7 +352,7 @@ class TestBrentVectorised:
         a = np.zeros(10)
         b = np.ones(10) * 5.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-10, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=func_params, tol=1e-10, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -371,7 +378,7 @@ class TestBrentVectorised:
         a = np.zeros(5)
         b = np.ones(5) * np.pi / 2
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-10, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=func_params, tol=1e-10, max_iter=100)
 
         # Compare with scipy
         expected = np.array(
@@ -392,13 +399,12 @@ class TestBrentVectorised:
             return x - k
 
         k_values = np.array([0.0, 5.0, 10.0])
-        func_params = k_values.reshape(-1, 1)
 
         # Roots at lower boundary
         a = k_values
         b = k_values + 5.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, k_values, atol=1e-8)
@@ -411,14 +417,13 @@ class TestBrentVectorised:
             return x**2 - k
 
         k_values = np.array([4.0, 9.0, 16.0])
-        func_params = k_values.reshape(-1, 1)
         expected_roots = np.sqrt(k_values)
 
         # Narrow brackets around solution
         a = expected_roots - 0.1
         b = expected_roots + 0.1
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, expected_roots, atol=1e-8)
@@ -438,12 +443,11 @@ class TestBrentConsistencyWithScipy:
             return x**3 - k
 
         k_values = np.random.uniform(1.0, 100.0, n_solves)
-        func_params = k_values.reshape(-1, 1)
 
         a = np.zeros(n_solves)
         b = np.cbrt(k_values) + 2.0
 
-        roots, _, converged = _brent_vectorised(f, func_params, a, b, 1e-10, 100)
+        roots, _, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-10, max_iter=100)
 
         # Compare with scipy
         expected = np.array([brentq(lambda x: x**3 - k, 0.0, b[i]) for i, k in enumerate(k_values)])
@@ -472,7 +476,7 @@ class TestBrentConsistencyWithScipy:
         b = T
 
         roots, iters, converged = _brent_vectorised(
-            simplified_wetbulb, func_params, a, b, 1e-8, 100
+            simplified_wetbulb, a, b, func_params=func_params, tol=1e-8, max_iter=100
         )
 
         # Compare with scipy
@@ -503,12 +507,11 @@ class TestBrentConsistencyWithScipy:
             return x**3 - k
 
         k_values = np.array([8.0, 27.0, 64.0, 125.0, 216.0])
-        func_params = k_values.reshape(-1, 1)
 
         a = np.zeros(5)
         b = np.ones(5) * 10.0
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-10, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-10, max_iter=100)
 
         assert np.all(converged)
         # Brent should converge in fewer iterations than bisection
@@ -529,13 +532,13 @@ class TestBrentEdgeCases:
             return x**3 - k
 
         k = 8.0
-        func_params = np.array([[k]])
+        func_params = np.array([k])
 
         # Very wide bracket
         a = np.array([-1000.0])
         b = np.array([1000.0])
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=func_params, tol=1e-8, max_iter=100)
 
         assert converged[0]
         assert np.isclose(roots[0], 2.0, atol=1e-8)
@@ -548,12 +551,11 @@ class TestBrentEdgeCases:
             return slope * x
 
         slopes = np.array([1.0, 2.0, 0.5, 3.0])
-        func_params = slopes.reshape(-1, 1)
 
         a = np.full(4, -1.0)
         b = np.full(4, 1.0)
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-10, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=slopes, tol=1e-10, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, 0.0, atol=1e-10)
@@ -567,13 +569,13 @@ class TestBrentEdgeCases:
             return x**2 - k
 
         k = 4.0
-        func_params = np.array([[k]])
+        func_params = np.array([k])
 
         # Bracket contains positive root only
         a = np.array([0.0])
         b = np.array([5.0])
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=func_params, tol=1e-8, max_iter=100)
 
         assert converged[0]
         assert np.isclose(roots[0], 2.0, atol=1e-8)
@@ -587,12 +589,11 @@ class TestBrentEdgeCases:
             return x**5 - k
 
         k_values = np.array([0.00001, 0.0001, 0.001])
-        func_params = k_values.reshape(-1, 1)
 
         a = np.zeros(3)
         b = np.ones(3) + 0.1
 
-        roots, iters, converged = _brent_vectorised(f, func_params, a, b, 1e-8, 100)
+        roots, iters, converged = _brent_vectorised(f, a, b, func_params=k_values, tol=1e-8, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, k_values ** (1 / 5), atol=1e-8)
