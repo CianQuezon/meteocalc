@@ -76,8 +76,7 @@ def _newton_raphson_vectorised(
     Returns:
         Array of (root, iterations, converged)
     """
-    func_params = np.asarray(func_params, dtype=np.float64)
-
+    x0 = np.asarray(x0, dtype=np.float64)
     n_solves = len(x0)
 
     func_params, num_params = _validate_and_prepare_params(
@@ -166,8 +165,7 @@ def _bisection_vectorised(
     Returns:
         - Array of roots in (root, iterations, converged)
     """
-    func_params = np.asarray(func_params, dtype=np.float64)
-
+    a = np.asarray(a, dtype=np.float64)
     n_solves = len(a)
 
     func_params, num_params = _validate_and_prepare_params(
@@ -296,7 +294,6 @@ def _brent_vectorised(
     """
 
     a = np.asarray(a, dtype=np.float64)
-
     n_solves = len(a)
 
     func_params, num_params = _validate_and_prepare_params(
