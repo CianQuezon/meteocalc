@@ -4,12 +4,13 @@ Root finding solvers with using Numba JIT compilation.
 Author: Cian Quezon
 """
 
+from typing import Callable, Optional, Tuple
+
 import numpy as np
 import numpy.typing as npt
+from numba import njit
 
-from numba import njit, prange
 from meteorological_equations.math.solvers._codegen import generate_vectorised_solver
-from typing import Callable, Tuple, List, Optional
 from meteorological_equations.math.solvers._enums import MethodType
 
 

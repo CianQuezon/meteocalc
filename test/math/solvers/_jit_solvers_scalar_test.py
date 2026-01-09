@@ -9,12 +9,12 @@ Author: Cian Quezon
 import numpy as np
 import pytest
 from numba import njit
-from scipy.optimize import newton, brentq
+from scipy.optimize import brentq, newton
 
 from meteorological_equations.math.solvers._jit_solvers import (
-    _newton_raphson_scalar,
     _bisection_scalar,
     _brent_scalar,
+    _newton_raphson_scalar,
 )
 
 

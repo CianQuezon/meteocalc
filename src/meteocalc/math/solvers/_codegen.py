@@ -4,11 +4,12 @@ Codegen function for vectorised solvers
 Author: Cian Quezon
 """
 
+from typing import Callable, Union
+
 import numpy as np
 import numpy.typing as npt
-
 from numba import njit, prange
-from typing import Callable, Tuple, Union
+
 from meteorological_equations.math.solvers._enums import MethodType
 from meteorological_equations.shared._enum_tools import parse_enum
 
@@ -49,7 +50,7 @@ def generate_vectorised_solver(
 
 @njit(parallel = True)
 def _open_solver_generated(func, func_prime, func_params, x0, tol, max_iter):
-    
+
     n = len(x0)
     root_arr = np.empty(n, dtype=np.float64)
     iterations_arr = np.empty(n, dtype=np.int64)
@@ -75,7 +76,7 @@ def _open_solver_generated(func, func_prime, func_params, x0, tol, max_iter):
 
 @njit(parallel = True)
 def _bracket_solver_generated(func, func_params, a, b, tol, max_iter):
-    
+
     n = len(a)
     root_arr = np.empty(n, dtype=np.float64)
     iterations_arr = np.empty(n, dtype=np.int64)
