@@ -9,7 +9,7 @@ import numpy.typing as npt
 
 from numba import njit, prange
 from meteorological_equations.math.solvers._codegen import generate_vectorised_solver
-from typing import Callable, Tuple, List
+from typing import Callable, Tuple, List, Optional
 from meteorological_equations.math.solvers._enums import MethodType
 
 @njit
@@ -318,3 +318,46 @@ def _brent_vectorised(
     )
 
     return solver(func, func_params, a, b, tol, max_iter)
+
+
+def _validate_and_prepare_params(
+        func_params: Optional[npt.ArrayLike],
+        n_solves: int,
+) -> Tuple[npt.NDArray[np.float64], int]:
+    """
+    Validates and prepares the function parameters for vectorised solvers
+
+    Args:
+        - func_params (npt.ArrayLike) = Array of function parameters or None for no parameters
+        - n_solves (int) = Number of solves
+    
+    Returns:
+        - (prepared_params, num_params) = Prepared function parameters and number of parameters 
+    """
+    if func_params is None:
+        return np.empty((n_solves, 0), dtype=np.float64), 0
+    
+    func_params = np.asarray(func_params, dtype=np.float64)
+
+    if func_params.ndim == 1:
+
+        if len(func_params) != n_solves:
+            raise ValueError(
+                f"func_params length ({len(func_params)}) must match "
+                f"number of solves ({n_solves})"
+            )
+        num_params = 1
+        func_params = func_params.reshape(-1, 1)
+    
+    else:
+        if func_params.shape[0] != n_solves:
+            raise ValueError(
+                f"func_params rows ({func_params.shape[0]}) must match"
+                f"number of solves ({n_solves})"
+            )
+        
+        num_params = func_params.shape[1]
+
+
+    
+    return func_params, num_params
