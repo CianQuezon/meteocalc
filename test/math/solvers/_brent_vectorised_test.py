@@ -40,7 +40,7 @@ class TestBrentVectorised:
         assert np.allclose(roots, 2.0, atol=1e-8)
 
     def test_no_parameters_omitted(self):
-        """Test multiple solves with no parameters (omitted)."""
+        """Test multiple solves with no parameters (omitted argument)."""
 
         @njit
         def f(x):
@@ -50,7 +50,11 @@ class TestBrentVectorised:
         a = np.zeros(100)
         b = np.ones(100) * 5.0
 
-        roots, iters, converged = _brent_vectorised(f, a, b)  # func_params omitted
+        roots, iters, converged = _brent_vectorised(
+            f,
+            a,
+            b,  # func_params omitted entirely
+        )
 
         # Compare with scipy
         expected = brentq(lambda x: x**2 - 4, 0.0, 5.0)
@@ -76,7 +80,7 @@ class TestBrentVectorised:
         )
 
         # Compare with scipy
-        expected = np.array([brentq(lambda x: x**3 - k, 0.0, 10.0) for k in k_values])
+        expected = np.array([brentq(lambda x, k=k: x**3 - k, 0.0, 10.0) for k in k_values])
 
         assert np.all(converged)
         assert np.allclose(roots, expected, atol=1e-8)
@@ -105,7 +109,7 @@ class TestBrentVectorised:
         # Compare with scipy
         expected = np.array(
             [
-                brentq(lambda x: a_values[i] * x**3 - b_values[i], a_bounds[i], b_bounds[i])
+                brentq(lambda x, i=i: a_values[i] * x**3 - b_values[i], a_bounds[i], b_bounds[i])
                 for i in range(n)
             ]
         )
@@ -141,7 +145,9 @@ class TestBrentVectorised:
         # Compare with scipy
         expected = np.array(
             [
-                brentq(lambda x: params[i, 0] * x**3 + params[i, 1] * x + params[i, 2], a[i], b[i])
+                brentq(
+                    lambda x, i=i: params[i, 0] * x**3 + params[i, 1] * x + params[i, 2], a[i], b[i]
+                )
                 for i in range(len(params))
             ]
         )
@@ -178,7 +184,7 @@ class TestBrentVectorised:
         expected = np.array(
             [
                 brentq(
-                    lambda T: (
+                    lambda T, i=i: (
                         T
                         - func_params[i, 1]
                         - func_params[i, 3]
@@ -222,7 +228,7 @@ class TestBrentVectorised:
         expected = np.array(
             [
                 brentq(
-                    lambda x: (
+                    lambda x, i=i: (
                         params[i, 0] * x**4
                         + params[i, 1] * x**3
                         + params[i, 2] * x**2
@@ -283,12 +289,12 @@ class TestBrentVectorised:
         )
 
         # Check expected convergence pattern
-        assert converged[0] == True  # offset = -4 (has root)
-        assert converged[1] == False  # offset = 1 (no root)
-        assert converged[2] == True  # offset = -9 (has root)
-        assert converged[3] == False  # offset = 5 (no root)
-        assert converged[4] == True  # offset = -16 (has root)
-        assert converged[5] == True  # offset = -25 (has root)
+        assert converged[0]        # offset = -4 (has root)
+        assert not converged[1]    # offset = 1 (no root)
+        assert converged[2]        # offset = -9 (has root)
+        assert not converged[3]    # offset = 5 (no root)
+        assert converged[4]        # offset = -16 (has root)
+        assert converged[5]        # offset = -25 (has root)
 
         # Check converged roots
         assert np.isclose(roots[0], 2.0, atol=1e-8)
@@ -380,7 +386,10 @@ class TestBrentVectorised:
 
         # Compare with scipy
         expected = np.array(
-            [brentq(lambda x: a_values[i] * np.exp(x) - b_values[i], 0.0, 5.0) for i in range(10)]
+            [
+                brentq(lambda x, i=i: a_values[i] * np.exp(x) - b_values[i], 0.0, 5.0)
+                for i in range(10)
+            ]
         )
 
         assert np.all(converged)
@@ -409,7 +418,7 @@ class TestBrentVectorised:
         # Compare with scipy
         expected = np.array(
             [
-                brentq(lambda x: amplitudes[i] * np.sin(x) - offsets[i], 0.0, np.pi / 2)
+                brentq(lambda x, i=i: amplitudes[i] * np.sin(x) - offsets[i], 0.0, np.pi / 2)
                 for i in range(5)
             ]
         )
@@ -482,7 +491,9 @@ class TestBrentConsistencyWithScipy:
         )
 
         # Compare with scipy
-        expected = np.array([brentq(lambda x: x**3 - k, 0.0, b[i]) for i, k in enumerate(k_values)])
+        expected = np.array(
+            [brentq(lambda x, k=k: x**3 - k, 0.0, b[i]) for i, k in enumerate(k_values)]
+        )
 
         assert np.all(converged)
         assert np.allclose(roots, expected, atol=1e-10)
@@ -515,7 +526,7 @@ class TestBrentConsistencyWithScipy:
         expected = np.array(
             [
                 brentq(
-                    lambda Tw: (Tw - func_params[i, 1])
+                    lambda Tw, i=i: (Tw - func_params[i, 1])
                     - 0.15 * (func_params[i, 0] - Tw) * (func_params[i, 2] / 101325.0),
                     a[i],
                     b[i],
