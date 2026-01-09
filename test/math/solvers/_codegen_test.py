@@ -59,7 +59,7 @@ class TestCodegenOpenMethods:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 1, MethodType.OPEN)
@@ -73,7 +73,7 @@ class TestCodegenOpenMethods:
 
         # Compare with scipy
         expected = np.array(
-            [newton(lambda x: x**2 - k, 1.5, fprime=lambda x: 2 * x) for k in k_values]
+            [newton(lambda x, k=k: x**2 - k, 1.5, fprime=lambda x: 2 * x) for k in k_values]
         )
 
         assert np.all(converged)
@@ -88,7 +88,7 @@ class TestCodegenOpenMethods:
             return T - Td - factor * (T_surf - T)
 
         @njit
-        def fp(T, T_surf, Td, factor):
+        def fp(_T, _T_surf, _Td, factor):
             return 1.0 + factor
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 3, MethodType.OPEN)
@@ -111,9 +111,9 @@ class TestCodegenOpenMethods:
         expected = np.array(
             [
                 newton(
-                    lambda T: T - params[i, 1] - params[i, 2] * (params[i, 0] - T),
+                    lambda T, i=i: T - params[i, 1] - params[i, 2] * (params[i, 0] - T),
                     x0[i],
-                    fprime=lambda T: 1.0 + params[i, 2],
+                    fprime=lambda _T, i=i: 1.0 + params[i, 2],
                 )
                 for i in range(len(params))
             ]
@@ -130,7 +130,7 @@ class TestCodegenOpenMethods:
             return p0 * x**4 + p1 * x**3 + p2 * x**2 + p3 * x + p4
 
         @njit
-        def fp(x, p0, p1, p2, p3, p4):
+        def fp(x, p0, p1, p2, p3, _p4):
             return 4 * p0 * x**3 + 3 * p1 * x**2 + 2 * p2 * x + p3
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 5, MethodType.OPEN)
@@ -151,13 +151,13 @@ class TestCodegenOpenMethods:
         expected = np.array(
             [
                 newton(
-                    lambda x: params[i, 0] * x**4
+                    lambda x, i=i: params[i, 0] * x**4
                     + params[i, 1] * x**3
                     + params[i, 2] * x**2
                     + params[i, 3] * x
                     + params[i, 4],
                     x0[i],
-                    fprime=lambda x: 4 * params[i, 0] * x**3
+                    fprime=lambda x, i=i: 4 * params[i, 0] * x**3
                     + 3 * params[i, 1] * x**2
                     + 2 * params[i, 2] * x
                     + params[i, 3],
@@ -177,7 +177,7 @@ class TestCodegenOpenMethods:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 1, MethodType.OPEN)
@@ -232,7 +232,7 @@ class TestCodegenBracketMethods:
 
         roots, iters, converged = solver(f, func_params, a, b, 1e-6, 100)
 
-        expected = np.array([brentq(lambda x: x**3 - k, 0.0, 10.0) for k in k_values])
+        expected = np.array([brentq(lambda x, k=k: x**3 - k, 0.0, 10.0) for k in k_values])
 
         assert np.all(converged)
         assert np.allclose(roots, expected, atol=1e-6)
@@ -266,7 +266,7 @@ class TestCodegenBracketMethods:
         expected = np.array(
             [
                 brentq(
-                    lambda x: params[i, 0] * x**3 + params[i, 1] * x + params[i, 2],
+                    lambda x, i=i: params[i, 0] * x**3 + params[i, 1] * x + params[i, 2],
                     a_vals[i],
                     b_vals[i],
                 )
@@ -326,7 +326,7 @@ class TestCodegenBracketMethods:
         expected = np.array(
             [
                 brentq(
-                    lambda T: T
+                    lambda T, i=i: T
                     - params[i, 1]
                     - params[i, 3] * (params[i, 0] - T) * (params[i, 2] / 101325.0),
                     250.0,
@@ -351,7 +351,7 @@ class TestCodegenCaching:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 1, MethodType.OPEN)
@@ -383,11 +383,11 @@ class TestCodegenCaching:
             return a * x**2 - b
 
         @njit
-        def fp1(x, k):
+        def fp1(x, _k):
             return 2 * x
 
         @njit
-        def fp2(x, a, b):
+        def fp2(x, a, _b):
             return 2 * a * x
 
         # Generate two different solvers
@@ -424,9 +424,9 @@ class TestCodegenEdgeCases:
 
         roots, iters, converged = solver(f, offsets, a, b, 1e-6, 100)
 
-        assert converged[0] == True
-        assert converged[1] == False
-        assert converged[2] == True
+        assert converged[0]
+        assert not converged[1]
+        assert converged[2]
         assert np.isnan(roots[1])
 
     def test_invalid_method_type(self):
@@ -467,7 +467,7 @@ class TestCodegenPerformance:
             return a * x**2 - b
 
         @njit
-        def fp(x, a, b):
+        def fp(x, a, _b):
             return 2 * a * x
 
         solver = generate_vectorised_solver(_newton_raphson_scalar, 2, MethodType.OPEN)
