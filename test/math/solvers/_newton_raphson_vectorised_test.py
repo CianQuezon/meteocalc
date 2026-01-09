@@ -18,7 +18,7 @@ class TestNewtonRaphsonVectorised:
     """Test vectorised Newton-Raphson solver with codegen parameter handling."""
 
     def test_no_parameters_multiple_solves(self):
-        """Test multiple solves with no parameters."""
+        """Test multiple solves with no parameters (None)."""
 
         @njit
         def f(x):
@@ -28,11 +28,35 @@ class TestNewtonRaphsonVectorised:
         def fp(x):
             return 2 * x
 
-        # 100 solves, 0 parameters
-        func_params = np.empty((100, 0), dtype=np.float64)
+        # 100 solves, no parameters (None)
         x0 = np.ones(100) * 1.5
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=None, tol=1e-6, max_iter=50)
+
+        # Compare with scipy
+        expected = np.array(
+            [newton(lambda x: x**2 - 4, 1.5, fprime=lambda x: 2 * x) for _ in range(100)]
+        )
+
+        assert np.all(converged)
+        assert np.allclose(roots, expected, atol=1e-6)
+        assert np.allclose(roots, 2.0, atol=1e-6)
+
+    def test_no_parameters_omitted(self):
+        """Test multiple solves with no parameters (omitted)."""
+
+        @njit
+        def f(x):
+            return x**2 - 4
+
+        @njit
+        def fp(x):
+            return 2 * x
+
+        # 100 solves, no parameters (omitted)
+        x0 = np.ones(100) * 1.5
+
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0)  # func_params omitted
 
         # Compare with scipy
         expected = np.array(
@@ -56,10 +80,9 @@ class TestNewtonRaphsonVectorised:
 
         # 50 solves, 1 parameter each
         k_values = np.linspace(4.0, 100.0, 50)
-        func_params = k_values.reshape(-1, 1)
         x0 = np.sqrt(k_values) * 0.8  # Start near solution
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=k_values, tol=1e-6, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -90,7 +113,7 @@ class TestNewtonRaphsonVectorised:
         func_params = np.column_stack([a_values, b_values])
         x0 = np.sqrt(b_values) * 0.8
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=func_params, tol=1e-6, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -127,7 +150,7 @@ class TestNewtonRaphsonVectorised:
         func_params = np.column_stack([T_surf, Td, factor])
         x0 = (T_surf + Td) / 2
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=func_params, tol=1e-6, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -166,7 +189,7 @@ class TestNewtonRaphsonVectorised:
         func_params = np.column_stack([T_surf, Td, P, gamma])
         x0 = Td + 5.0
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=func_params, tol=1e-6, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -210,7 +233,7 @@ class TestNewtonRaphsonVectorised:
         )
         x0 = np.array([1.5, 1.3, 1.8])
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=params, tol=1e-6, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -252,10 +275,9 @@ class TestNewtonRaphsonVectorised:
         # Large scale: 10,000 solves
         n = 10000
         k_values = np.linspace(1.0, 100.0, n)
-        func_params = k_values.reshape(-1, 1)
         x0 = np.sqrt(k_values) * 0.7
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=k_values, tol=1e-6, max_iter=50)
 
         # All should converge
         assert np.all(converged)
@@ -277,10 +299,9 @@ class TestNewtonRaphsonVectorised:
 
         # Mix of valid (negative offset) and invalid (positive offset) cases
         offsets = np.array([-4.0, 1.0, -9.0, 5.0, -16.0])
-        func_params = offsets.reshape(-1, 1)
         x0 = np.ones(5) * 1.0
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=offsets, tol=1e-6, max_iter=50)
 
         # Check expected convergence pattern
         assert converged[0] == True  # offset = -4
@@ -307,10 +328,10 @@ class TestNewtonRaphsonVectorised:
 
         # Same parameter, different starting points
         k = 27.0
-        func_params = np.full((5, 1), k)
+        func_params = np.full(5, k)
         x0 = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
 
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-6, 50)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=func_params, tol=1e-6, max_iter=50)
 
         # All should converge to same root (3.0)
         assert np.all(converged)
@@ -328,11 +349,10 @@ class TestNewtonRaphsonVectorised:
             return 2 * x
 
         k_values = np.array([4.0, 9.0, 16.0])
-        func_params = k_values.reshape(-1, 1)
         x0 = np.ones(3) * 1.5
 
         # Very tight tolerance
-        roots, iters, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-12, 100)
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=k_values, tol=1e-12, max_iter=100)
 
         assert np.all(converged)
         assert np.allclose(roots, np.sqrt(k_values), atol=1e-12)
@@ -352,14 +372,7 @@ class TestNewtonRaphsonVectorised:
         k_values = np.array([4.0, 9.0, 16.0, 25.0, 36.0])
         x0 = np.ones(5) * 1.5
 
-        roots, iters, converged = _newton_raphson_vectorised(
-            f,
-            fp,
-            k_values,
-            x0,
-            1e-6,
-            50,  # Pass 1D array directly
-        )
+        roots, iters, converged = _newton_raphson_vectorised(f, fp, x0, func_params=k_values, tol=1e-6, max_iter=50)
 
         assert np.all(converged)
         assert np.allclose(roots, np.sqrt(k_values), atol=1e-6)
@@ -381,10 +394,9 @@ class TestVectorisedConsistencyWithScipy:
             return 2 * x
 
         k_values = np.random.uniform(1.0, 100.0, n_solves)
-        func_params = k_values.reshape(-1, 1)
         x0 = np.sqrt(k_values) * 0.8
 
-        roots, _, converged = _newton_raphson_vectorised(f, fp, func_params, x0, 1e-8, 50)
+        roots, _, converged = _newton_raphson_vectorised(f, fp, x0, func_params=k_values, tol=1e-8, max_iter=50)
 
         # Compare with scipy
         expected = np.array(
@@ -420,7 +432,7 @@ class TestVectorisedConsistencyWithScipy:
         x0 = Td + 2.0  # Start slightly above dewpoint
 
         roots, iters, converged = _newton_raphson_vectorised(
-            simplified_wetbulb, simplified_wetbulb_prime, func_params, x0, 1e-6, 50
+            simplified_wetbulb, simplified_wetbulb_prime, x0, func_params=func_params, tol=1e-6, max_iter=50
         )
 
         # Compare with scipy
