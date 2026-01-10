@@ -47,7 +47,7 @@ class TestNewtonRaphsonScalar:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         k = 9.0
@@ -66,7 +66,7 @@ class TestNewtonRaphsonScalar:
             return a * x**2 - b
 
         @njit
-        def fp(x, a, b):
+        def fp(x, a, _b):
             return 2 * a * x
 
         a, b = 2.0, 8.0
@@ -85,7 +85,7 @@ class TestNewtonRaphsonScalar:
             return a * x**2 + b * x + c
 
         @njit
-        def fp(x, a, b, c):
+        def fp(x, a, b, _c):
             return 2 * a * x + b
 
         # Solve x^2 - 5x + 6 = 0, root at x=2 or x=3
@@ -105,7 +105,7 @@ class TestNewtonRaphsonScalar:
             return T - Td - factor * (T_surf - T) * (P / 101325.0)
 
         @njit
-        def fp(T, T_surf, Td, P, factor):
+        def fp(_T, _T_surf, _Td, P, factor):
             return 1.0 + factor * (P / 101325.0)
 
         T_surf, Td, P, factor = 293.15, 283.15, 85000.0, 0.2
@@ -116,7 +116,7 @@ class TestNewtonRaphsonScalar:
         scipy_root = newton(
             lambda T: T - Td - factor * (T_surf - T) * (P / 101325.0),
             285.0,
-            fprime=lambda T: 1.0 + factor * (P / 101325.0),
+            fprime=lambda _T: 1.0 + factor * (P / 101325.0),
         )
 
         assert converged
@@ -130,7 +130,7 @@ class TestNewtonRaphsonScalar:
             return p0 * x**4 + p1 * x**3 + p2 * x**2 + p3 * x + p4
 
         @njit
-        def fp(x, p0, p1, p2, p3, p4):
+        def fp(x, p0, p1, p2, p3, _p4):
             return 4 * p0 * x**3 + 3 * p1 * x**2 + 2 * p2 * x + p3
 
         params = (1.0, 0.0, -10.0, 0.0, 9.0)  # x^4 - 10x^2 + 9
@@ -160,7 +160,7 @@ class TestNewtonRaphsonScalar:
             return a * np.sin(x) - b
 
         @njit
-        def fp(x, a, b):
+        def fp(x, a, _b):
             return a * np.cos(x)
 
         a, b = 2.0, 1.0
@@ -195,7 +195,7 @@ class TestNewtonRaphsonScalar:
             return x**2 + offset  # No real roots for positive offset
 
         @njit
-        def fp(x, offset):
+        def fp(x, _offset):
             return 2 * x
 
         offset = 1.0
@@ -486,7 +486,7 @@ class TestConsistencyWithScipy:
             return x**2 - param
 
         @njit
-        def fp(x, param):
+        def fp(x, _param):
             return 2 * x
 
         x0 = np.sqrt(k) * 0.5
