@@ -4,11 +4,14 @@ Root finding solvers with using Numba JIT compilation.
 Author: Cian Quezon
 """
 
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
-from numba import njit, prange
+from numba import njit
+
+from meteorological_equations.math.solvers._codegen import generate_vectorised_solver
+from meteorological_equations.math.solvers._enums import MethodType
 
 
 @njit
@@ -18,6 +21,7 @@ def _newton_raphson_scalar(
     x0: float,
     tol: float = 1e-6,
     max_iter: int = 50,
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Newton raphson for root finding.
@@ -28,6 +32,7 @@ def _newton_raphson_scalar(
         x0(float) = Initial guess
         tol(float) = Tolerance for convergence
         max_iter(int) = Maximum iterations
+        func_params = function parameters of the function
 
     Returns:
         (root, iterations, converged)
@@ -35,8 +40,8 @@ def _newton_raphson_scalar(
     x = x0
 
     for i in range(max_iter):
-        fx = func(x)
-        fpx = func_prime(x)
+        fx = func(x, *func_params)
+        fpx = func_prime(x, *func_params)
 
         if abs(fpx) < 1e-15:
             return x, i, False
@@ -51,11 +56,11 @@ def _newton_raphson_scalar(
     return x, max_iter, False
 
 
-@njit(parallel=True)
 def _newton_raphson_vectorised(
     func: Callable[[float], float],
     func_prime: Callable[[float], float],
     x0: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 50,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -65,6 +70,7 @@ def _newton_raphson_vectorised(
     Args:
         - func(Callable[[float], float]) = function required to solve the root
         - func_prime(Callable[[float], float]) = derivative of the function
+        - func_params(npt.ArrayLike) = an array of function parameters
         - x0(npt.ArrayLike) = Array of initial guesses
         - tol (float) = Convergence tolerance
         - max_iter(int) = maximum amount of iterations
@@ -72,25 +78,28 @@ def _newton_raphson_vectorised(
     Returns:
         Array of (root, iterations, converged)
     """
-    n = len(x0)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    x0 = np.asarray(x0, dtype=np.float64)
+    n_solves = len(x0)
 
-    for i in prange(n):
-        root, iteration, converged = _newton_raphson_scalar(
-            func=func, func_prime=func_prime, x0=x0[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params, n_solves=n_solves
+    )
 
-    return root_arr, iterations_arr, converged_arr
+    solver = generate_vectorised_solver(
+        scalar_func=_newton_raphson_scalar, num_params=num_params, method_type=MethodType.OPEN
+    )
+
+    return solver(func, func_prime, func_params, x0, tol, max_iter)
 
 
 @njit
 def _bisection_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100
+    func: Callable[[float], float],
+    a: float,
+    b: float,
+    tol: float = 1e-6,
+    max_iter: int = 100,
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Scalar bisection to find roots.
@@ -101,13 +110,14 @@ def _bisection_scalar(
         - b (float) = Upper bracket bound
         - tol (float) = Tolerance for convergence
         - max_iter(int) = Maximum iterations
+        - func_params = function parameters
 
     Returns:
         - (root, iterations, converged)
 
     """
-    fa = func(a)
-    fb = func(b)
+    fa = func(a, *func_params)
+    fb = func(b, *func_params)
 
     if fa == 0.0:
         return a, 0, True
@@ -123,7 +133,7 @@ def _bisection_scalar(
 
     for i in range(max_iter):
         c = (a + b) / 2.0
-        fc = func(c)
+        fc = func(c, *func_params)
 
         if abs(fc) < tol or abs(b - a) / 2.0 < tol:
             return c, i + 1, True
@@ -137,11 +147,11 @@ def _bisection_scalar(
     return (a + b) / 2.0, max_iter, False
 
 
-@njit(parallel=True)
 def _bisection_vectorised(
     func: Callable[[float], float],
     a: npt.ArrayLike,
     b: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 100,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -149,7 +159,8 @@ def _bisection_vectorised(
     Vectorised version bisection method for arrays.
 
     Args:
-        - func: Callable[[float], float] = Function to solve for the root
+        - func (Callable[[float], float]) = Function to solve for the root
+        - func_params (npt.ArrayLike) = An array of function parameters
         - a (npt.NDArray) = Upper bracket bound
         - b (npt.NDArray) = Lower bracket bound
         - tol (float) = Convergence tolerance
@@ -158,26 +169,28 @@ def _bisection_vectorised(
     Returns:
         - Array of roots in (root, iterations, converged)
     """
+    a = np.asarray(a, dtype=np.float64)
+    n_solves = len(a)
 
-    n = len(a)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params, n_solves=n_solves
+    )
 
-    for i in prange(n):
-        root, iteration, converged = _bisection_scalar(
-            func=func, a=a[i], b=b[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
+    solver = generate_vectorised_solver(
+        scalar_func=_bisection_scalar, num_params=num_params, method_type=MethodType.BRACKET
+    )
 
-    return root_arr, iterations_arr, converged_arr
+    return solver(func, func_params, a, b, tol, max_iter)
 
 
 @njit
 def _brent_scalar(
-    func: Callable[[float], float], a: float, b: float, tol: float = 1e-6, max_iter: int = 100
+    func: Callable[[float], float],
+    a: float,
+    b: float,
+    tol: float = 1e-6,
+    max_iter: int = 100,
+    *func_params,
 ) -> Tuple[float, int, bool]:
     """
     Brent's method to find roots.
@@ -188,13 +201,14 @@ def _brent_scalar(
         - b (float) = Upper bracket bound
         - tol (float) = Tolerance for convergence
         - max_iter (int) = maximum iterations
+        - func_params = function parameters for the function
 
     Returns:
         - (root, iterations, converged)
 
     """
-    fa = func(a)
-    fb = func(b)
+    fa = func(a, *func_params)
+    fb = func(b, *func_params)
 
     if fa == 0.0:
         return a, 0, True
@@ -241,7 +255,7 @@ def _brent_scalar(
         else:
             mflag = False
 
-        fs = func(s)
+        fs = func(s, *func_params)
 
         d = c
         c = b
@@ -261,11 +275,11 @@ def _brent_scalar(
     return b, max_iter, False
 
 
-@njit(parallel=True)
 def _brent_vectorised(
     func: Callable[[float], float],
     a: npt.ArrayLike,
     b: npt.ArrayLike,
+    func_params: Optional[npt.ArrayLike] = None,
     tol: float = 1e-6,
     max_iter: int = 100,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
@@ -274,6 +288,7 @@ def _brent_vectorised(
 
     Args:
         - func: Callable[[float], float] = Function to solve for the root
+        - func_params (npt.ArrayLike) = An array of function parameters
         - a (npt.NDArray) = Upper bracket bound
         - b (npt.NDArray) = Lower bracket bound
         - tol (float) = Convergence tolerance
@@ -283,16 +298,53 @@ def _brent_vectorised(
         - Array of roots in (root, iterations, converged)
     """
 
-    n = len(a)
-    root_arr = np.empty(n, dtype=np.float64)
-    iterations_arr = np.empty(n, dtype=np.int64)
-    converged_arr = np.empty(n, dtype=np.bool_)
+    a = np.asarray(a, dtype=np.float64)
+    n_solves = len(a)
 
-    for i in prange(n):
-        root, iteration, converged = _brent_scalar(
-            func=func, a=a[i], b=b[i], tol=tol, max_iter=max_iter
-        )
-        root_arr[i] = root
-        iterations_arr[i] = iteration
-        converged_arr[i] = converged
-    return root_arr, iterations_arr, converged_arr
+    func_params, num_params = _validate_and_prepare_params(
+        func_params=func_params, n_solves=n_solves
+    )
+
+    solver = generate_vectorised_solver(
+        scalar_func=_brent_scalar, num_params=num_params, method_type=MethodType.BRACKET
+    )
+
+    return solver(func, func_params, a, b, tol, max_iter)
+
+
+def _validate_and_prepare_params(
+    func_params: Optional[npt.ArrayLike],
+    n_solves: int,
+) -> Tuple[npt.NDArray[np.float64], int]:
+    """
+    Validates and prepares the function parameters for vectorised solvers
+
+    Args:
+        - func_params (npt.ArrayLike) = Array of function parameters or None for no parameters
+        - n_solves (int) = Number of solves
+
+    Returns:
+        - (prepared_params, num_params) = Prepared function parameters and number of parameters
+    """
+    if func_params is None:
+        return np.empty((n_solves, 0), dtype=np.float64), 0
+
+    func_params = np.asarray(func_params, dtype=np.float64)
+
+    if func_params.ndim == 1:
+        if len(func_params) != n_solves:
+            raise ValueError(
+                f"func_params length ({len(func_params)}) must match number of solves ({n_solves})"
+            )
+        num_params = 1
+        func_params = func_params.reshape(-1, 1)
+
+    else:
+        if func_params.shape[0] != n_solves:
+            raise ValueError(
+                f"func_params rows ({func_params.shape[0]}) must matchnumber of solves ({n_solves})"
+            )
+
+        num_params = func_params.shape[1]
+
+    return func_params, num_params
