@@ -119,7 +119,7 @@ class Solver(ABC):
 
         if a_arr.ndim == 0:
             params = self._prepare_scalar_params(func_params=func_params)
-            return scalar_bracket_method_func(func=func, a=a, b=b, tol=tol, max_iter=max_iter, *params)
+            return scalar_bracket_method_func(func, a, b, tol, max_iter, *params)
         
         else:
             original_shape = a_arr.shape
@@ -163,11 +163,11 @@ class Solver(ABC):
             params = self._prepare_scalar_params(func_params=func_params)
             if func_prime is not None:
                 return scalar_open_method_func(
-                        func=func, func_prime=func_prime, x0=x0, tol=tol, max_iter=max_iter,
+                        func, func_prime, x0, tol, max_iter,
                         *params
                     )
             else:
-                return scalar_open_method_func(func=func, x0=x0, tol=tol, max_iter=max_iter, *params)
+                return scalar_open_method_func(func, x0, tol, max_iter, *params)
 
         else:
             original_shape = initial_guess_arr.shape
@@ -214,6 +214,7 @@ class NewtonRaphsonSolver(Solver):
         func: Callable[[float], float],
         func_prime: Callable[[float], float],
         x0: Union[float, npt.ArrayLike],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 50,
     ):
@@ -236,6 +237,7 @@ class NewtonRaphsonSolver(Solver):
             x0=x0,
             scalar_open_method_func=_newton_raphson_scalar,
             vectorised_open_method_func=_newton_raphson_vectorised,
+            func_params=func_params,
             tol=tol,
             max_iter=max_iter,
         )
@@ -255,6 +257,7 @@ class BisectionSolver(Solver):
         func: Callable[[float], float],
         a: Union[npt.ArrayLike, float],
         b: Union[npt.ArrayLike, float],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
     ):
@@ -276,6 +279,7 @@ class BisectionSolver(Solver):
             func=func,
             a=a,
             b=b,
+            func_params=func_params,
             scalar_bracket_method_func=_bisection_scalar,
             vector_bracket_method_func=_bisection_vectorised,
             tol=tol,
@@ -298,6 +302,7 @@ class BrentSolver(Solver):
         func: Callable[[float], float],
         a: Union[npt.ArrayLike, float],
         b: Union[npt.ArrayLike, float],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
     ):
@@ -318,6 +323,7 @@ class BrentSolver(Solver):
             func=func,
             a=a,
             b=b,
+            func_params=func_params,
             scalar_bracket_method_func=_brent_scalar,
             vector_bracket_method_func=_brent_vectorised,
             tol=tol,
