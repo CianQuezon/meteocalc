@@ -77,7 +77,7 @@ class TestNewtonRaphsonVectorised:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         # 50 solves, 1 parameter each
@@ -91,7 +91,7 @@ class TestNewtonRaphsonVectorised:
         # Compare with scipy
         expected = np.array(
             [
-                newton(lambda x: x**2 - k, x0[i], fprime=lambda x: 2 * x)
+                newton(lambda x, k=k: x**2 - k, x0[i], fprime=lambda x: 2 * x)
                 for i, k in enumerate(k_values)
             ]
         )
@@ -108,7 +108,7 @@ class TestNewtonRaphsonVectorised:
             return a * x**2 - b
 
         @njit
-        def fp(x, a, b):
+        def fp(x, a, _b):
             return 2 * a * x
 
         # 30 solves, 2 parameters each
@@ -125,9 +125,9 @@ class TestNewtonRaphsonVectorised:
         expected = np.array(
             [
                 newton(
-                    lambda x: a_values[i] * x**2 - b_values[i],
+                    lambda x, i=i: a_values[i] * x**2 - b_values[i],
                     x0[i],
-                    fprime=lambda x: 2 * a_values[i] * x,
+                    fprime=lambda x, i=i: 2 * a_values[i] * x,
                 )
                 for i in range(len(a_values))
             ]
@@ -144,7 +144,7 @@ class TestNewtonRaphsonVectorised:
             return T - Td - factor * (T_surf - T)
 
         @njit
-        def fp(T, T_surf, Td, factor):
+        def fp(_T, _T_surf, _Td, factor):
             return 1.0 + factor
 
         # 100 weather stations, 3 parameters each
@@ -164,9 +164,11 @@ class TestNewtonRaphsonVectorised:
         expected = np.array(
             [
                 newton(
-                    lambda T: T - func_params[i, 1] - func_params[i, 2] * (func_params[i, 0] - T),
+                    lambda T, i=i: T
+                    - func_params[i, 1]
+                    - func_params[i, 2] * (func_params[i, 0] - T),
                     x0[i],
-                    fprime=lambda T: 1.0 + func_params[i, 2],
+                    fprime=lambda _T, i=i: 1.0 + func_params[i, 2],
                 )
                 for i in range(n)
             ]
@@ -184,7 +186,7 @@ class TestNewtonRaphsonVectorised:
             return T - Td - gamma * (T_surf - T) * (P / 101325.0)
 
         @njit
-        def fp(T, T_surf, Td, P, gamma):
+        def fp(_T, _T_surf, _Td, P, gamma):
             return 1.0 + gamma * (P / 101325.0)
 
         # Multiple atmospheric profiles
@@ -205,7 +207,7 @@ class TestNewtonRaphsonVectorised:
         expected = np.array(
             [
                 newton(
-                    lambda T: (
+                    lambda T, i=i: (
                         T
                         - func_params[i, 1]
                         - func_params[i, 3]
@@ -213,7 +215,7 @@ class TestNewtonRaphsonVectorised:
                         * (func_params[i, 2] / 101325.0)
                     ),
                     x0[i],
-                    fprime=lambda T: 1.0 + func_params[i, 3] * (func_params[i, 2] / 101325.0),
+                    fprime=lambda _T, i=i: 1.0 + func_params[i, 3] * (func_params[i, 2] / 101325.0),
                 )
                 for i in range(n)
             ]
@@ -230,7 +232,7 @@ class TestNewtonRaphsonVectorised:
             return p0 * x**4 + p1 * x**3 + p2 * x**2 + p3 * x + p4
 
         @njit
-        def fp(x, p0, p1, p2, p3, p4):
+        def fp(x, p0, p1, p2, p3, _p4):
             return 4 * p0 * x**3 + 3 * p1 * x**2 + 2 * p2 * x + p3
 
         # Multiple polynomial solves
@@ -251,7 +253,7 @@ class TestNewtonRaphsonVectorised:
         expected = np.array(
             [
                 newton(
-                    lambda x: (
+                    lambda x, i=i: (
                         params[i, 0] * x**4
                         + params[i, 1] * x**3
                         + params[i, 2] * x**2
@@ -259,7 +261,7 @@ class TestNewtonRaphsonVectorised:
                         + params[i, 4]
                     ),
                     x0[i],
-                    fprime=lambda x: (
+                    fprime=lambda x, i=i: (
                         4 * params[i, 0] * x**3
                         + 3 * params[i, 1] * x**2
                         + 2 * params[i, 2] * x
@@ -281,7 +283,7 @@ class TestNewtonRaphsonVectorised:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         # Large scale: 10,000 solves
@@ -308,7 +310,7 @@ class TestNewtonRaphsonVectorised:
             return x**2 + offset
 
         @njit
-        def fp(x, offset):
+        def fp(x, _offset):
             return 2 * x
 
         # Mix of valid (negative offset) and invalid (positive offset) cases
@@ -320,11 +322,11 @@ class TestNewtonRaphsonVectorised:
         )
 
         # Check expected convergence pattern
-        assert converged[0] == True  # offset = -4
-        assert converged[1] == False  # offset = 1 (no real roots)
-        assert converged[2] == True  # offset = -9
-        assert converged[3] == False  # offset = 5 (no real roots)
-        assert converged[4] == True  # offset = -16
+        assert converged[0]  # offset = -4
+        assert not converged[1]  # offset = 1 (no real roots)
+        assert converged[2]  # offset = -9
+        assert not converged[3]  # offset = 5 (no real roots)
+        assert converged[4]  # offset = -16
 
         # Check converged roots are correct
         assert np.isclose(roots[0], 2.0, atol=1e-6)
@@ -339,7 +341,7 @@ class TestNewtonRaphsonVectorised:
             return x**3 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 3 * x**2
 
         # Same parameter, different starting points
@@ -363,7 +365,7 @@ class TestNewtonRaphsonVectorised:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         k_values = np.array([4.0, 9.0, 16.0])
@@ -385,7 +387,7 @@ class TestNewtonRaphsonVectorised:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         # 1D array (should be reshaped to (5, 1))
@@ -412,7 +414,7 @@ class TestVectorisedConsistencyWithScipy:
             return x**2 - k
 
         @njit
-        def fp(x, k):
+        def fp(x, _k):
             return 2 * x
 
         k_values = np.random.uniform(1.0, 100.0, n_solves)
@@ -425,7 +427,7 @@ class TestVectorisedConsistencyWithScipy:
         # Compare with scipy
         expected = np.array(
             [
-                newton(lambda x: x**2 - k, x0[i], fprime=lambda x: 2 * x)
+                newton(lambda x, k=k: x**2 - k, x0[i], fprime=lambda x: 2 * x)
                 for i, k in enumerate(k_values)
             ]
         )
@@ -443,7 +445,7 @@ class TestVectorisedConsistencyWithScipy:
             return (Tw - Td) - 0.15 * (T - Tw) * (P / 101325.0)
 
         @njit
-        def simplified_wetbulb_prime(Tw, T, Td, P):
+        def simplified_wetbulb_prime(_Tw, _T, _Td, P):
             return 1.0 + 0.15 * (P / 101325.0)
 
         # 100 weather stations
@@ -468,10 +470,10 @@ class TestVectorisedConsistencyWithScipy:
         expected = np.array(
             [
                 newton(
-                    lambda Tw: (Tw - func_params[i, 1])
+                    lambda Tw, i=i: (Tw - func_params[i, 1])
                     - 0.15 * (func_params[i, 0] - Tw) * (func_params[i, 2] / 101325.0),
                     x0[i],
-                    fprime=lambda Tw: 1.0 + 0.15 * (func_params[i, 2] / 101325.0),
+                    fprime=lambda _Tw, i=i: 1.0 + 0.15 * (func_params[i, 2] / 101325.0),
                 )
                 for i in range(n)
             ]

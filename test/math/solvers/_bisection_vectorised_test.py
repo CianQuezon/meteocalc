@@ -5,6 +5,7 @@ Tests parameter handling, parallel execution, and validates against scipy.
 
 Author: Cian Quezon
 """
+
 import numpy as np
 import pytest
 from numba import njit
