@@ -217,7 +217,10 @@ class NewtonRaphsonSolver(Solver):
         func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 50,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Newton Raphson Method.
 
@@ -260,7 +263,10 @@ class BisectionSolver(Solver):
         func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Bisection Method.
 
@@ -305,7 +311,10 @@ class BrentSolver(Solver):
         func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Brent Method.
 
