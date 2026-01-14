@@ -226,7 +226,7 @@ class RootSolvers:
 
         for backup_solver_name in backup_solvers:
             
-            back_up_solver_enum = parse_enum(backup_solver_name)
+            back_up_solver_enum = parse_enum(backup_solver_name, SolverName)
             back_up_solver = SolverMap[back_up_solver_enum]()
 
             method_type = back_up_solver.get_method_type()
