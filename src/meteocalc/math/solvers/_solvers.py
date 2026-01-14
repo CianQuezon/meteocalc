@@ -57,7 +57,7 @@ class Solver(ABC):
         """
         Returns the method type of the solver
         """
-        return self.method_type.value
+        return self.method_type
 
     @staticmethod
     def _prepare_scalar_params(
