@@ -111,66 +111,100 @@ class RootSolvers:
         
         Returns:
             An array or a scalar of (float, int, bool)
-        """
-        roots, iterations, converged_flag = results
+        """     
 
-        unconverged_mask = not(converged_flag)
-        unconverged_idx = np.where(unconverged_mask)[0]
-        
-        if np.all(converged_flag):
-            return results
-        
-        for backup_solver_name in backup_solvers:
+        roots = np.asarray(results[0])
+        iterations = np.asarray(results[1])
+        converged_flag = np.asarray(results[2])
+
+        if roots.ndim == 0:
+            scalar_results = (float(roots), int(iterations), bool(converged_flag))
             
-            backup_solver_enum = parse_enum(backup_solver_name, SolverName)        
-            back_up_solver_class = SolverMap[backup_solver_enum]
-            back_up_solver = back_up_solver_class()
+            scalar_a = float(a) if a is not None else None
+            scalar_b = float(b) if b is not None else None
+            scalar_x0 = float(x0) if x0 is not None else None
 
-            method_type = back_up_solver.get_method_type()
 
-            if method_type == (MethodType.OPEN or MethodType.HYBRID):
 
-                try:
-                    x0 = np.asarray(x0, dtype=np.float64)
-                    x0_unconverged = x0[unconverged_idx]
-                    func_params_unconverged = func_params[unconverged_idx]
+            return RootSolvers.__try_back_up_scalar(
+                func=func,
+                results=scalar_results,
+                a=scalar_a,
+                b=scalar_b,
+                x0=scalar_x0,
+                tol=tol,
+                max_iter=max_iter,
+                func_prime=func_prime,
+                func_params=func_params,
+                backup_solvers=backup_solvers
+
+            )
+        
+        else:
+            return results
+        # roots, iterations, converged_flag = results
+
+        # unconverged_mask = not(converged_flag)
+        # unconverged_idx = np.where(unconverged_mask)[0]
+        
+        # if np.all(converged_flag):
+        #     return results
+        
+        # for backup_solver_name in backup_solvers:
+            
+        #     backup_solver_enum = parse_enum(backup_solver_name, SolverName)        
+        #     back_up_solver_class = SolverMap[backup_solver_enum]
+        #     back_up_solver = back_up_solver_class()
+
+        #     method_type = back_up_solver.get_method_type()
+
+        #     if method_type == (MethodType.OPEN or MethodType.HYBRID):
+
+        #         try:
+        #             x0 = np.asarray(x0, dtype=np.float64)
+        #             x0_unconverged = x0[unconverged_idx]
+        #             func_params_unconverged = func_params[unconverged_idx]
                     
-                    updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
-                        func=func,
-                        func_prime=func_prime,
-                        func_params=func_params_unconverged,
-                        x0=x0_unconverged,
-                        tol=tol
-                        max_iter=max_iter
-                    )
+        #             updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+        #                 func=func,
+        #                 func_prime=func_prime,
+        #                 func_params=func_params_unconverged,
+        #                 x0=x0_unconverged,
+        #                 tol=tol,
+        #                 max_iter=max_iter
+        #             )
                 
-                except:
-                    if method_type == MethodType.OPEN:
+        #         except:
+        #             if method_type == MethodType.OPEN:
 
-                        pass
-                    continue
+        #                 pass
+        #             continue
 
-                results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
+        #         results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
                 
-            if method_type == (MethodType.HYBRID or MethodType.BRACKET):
-                a = np.asarray(a, dtype=np.float64)
-                b = np.asarray(b, dtype=np.float64)
-                func_params_unconverged = func_params[unconverged_idx]
+        #     if method_type == (MethodType.HYBRID or MethodType.BRACKET):
+        #         a = np.asarray(a, dtype=np.float64)
+        #         b = np.asarray(b, dtype=np.float64)
+        #         func_params_unconverged = func_params[unconverged_idx]
 
-                updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
-                    func=func,
-                    a=a,
-                    b=b,
-                    func_params=func_params,
-                    tol=tol,
-                    max_iter=max_iter
-                )
+        #         updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+        #             func=func,
+        #             a=a,
+        #             b=b,
+        #             func_params=func_params,
+        #             tol=tol,
+        #             max_iter=max_iter
+        #         )
    
             
-            results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
-            unconverged_mask = not(converged_flag)
-            unconverged_idx = np.where(unconverged_mask)[0]
+        #     results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
+        #     unconverged_mask = not(converged_flag)
+        #     unconverged_idx = np.where(unconverged_mask)[0]
 
+    
+    
+    
+    
     def __try_back_up_scalar(
         func: Callable[[float], float],
         results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
@@ -188,9 +222,90 @@ class RootSolvers:
         Docstring for __dispatch_back_up_scalar
 
         """
+        converged_flag = results[2]
 
         for backup_solver_name in backup_solvers:
-            back_up_solver
+            
+            back_up_solver_enum = parse_enum(backup_solver_name)
+            back_up_solver = SolverMap[back_up_solver_enum]()
+
+            method_type = back_up_solver.get_method_type()
+            
+            if method_type == MethodType.HYBRID:
+                converged_flag = False
+                
+                if x0 is not None:
+                    
+                    try:
+                        results = back_up_solver.find_root(func=func, func_prime=func_prime, x0=x0, func_params=func_params,
+                                                        tol=tol, max_iter=max_iter)
+                        converged_flag = results[2]
+                        
+                        if converged_flag:
+                            return results
+                        
+                    except Exception as e:
+                        warnings.warn(f"Open method failed: {e}")
+
+                if a is not None and b is not None:
+                    
+                    try:
+                        results = back_up_solver.find_root(func=func, a=a, b=b, func_params=func_params,
+                                                        tol=tol, max_iter=max_iter)
+                        converged_flag = results[2]
+                        if converged_flag:
+                            return results
+                        
+                    except Exception as e:
+                        warnings.warn(f"Bracketing method failed: {e}")
+
+                
+                if not converged_flag:
+                    warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                    continue
+
+
+            elif method_type == MethodType.BRACKET:
+
+                try:
+                    results = back_up_solver.find_root(func=func, a=a, b=b, func_params=func_params,
+                                                        tol=tol, max_iter=max_iter)
+                    
+                    converged_flag = results[2]
+
+                    if not converged_flag:
+                        warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                        continue
+
+                    return results
+
+                except Exception as e:
+                     
+                     warnings.warn(f"Bracketing method failed: {e}. Skipping to the next solver.")
+                     continue
+            
+            elif method_type == MethodType.OPEN:
+                
+                try:
+                    results = back_up_solver.find_root(func=func, func_prime=func_prime, x0=x0, func_params=func_params,
+                                                        tol=tol, max_iter=max_iter)
+                    converged_flag = results[2]
+
+                    if not converged_flag:
+                        warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                        continue
+                    return results
+                
+                except Exception as e:
+                     
+                     warnings.warn(f"Open method failed: {e}. Skipping to the next solver.")
+                     continue
+            
+            else:
+                warnings.warn("Unknown method type. Skipping to the next solver")
+        
+        return results
+
 
 
 
