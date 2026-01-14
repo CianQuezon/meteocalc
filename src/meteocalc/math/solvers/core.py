@@ -224,6 +224,9 @@ class RootSolvers:
         """
         converged_flag = results[2]
 
+        if converged_flag:
+            return results
+
         for backup_solver_name in backup_solvers:
             
             back_up_solver_enum = parse_enum(backup_solver_name, SolverName)
