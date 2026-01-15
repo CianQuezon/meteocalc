@@ -9,6 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from typing import Callable, Optional, Union, Tuple, List
+from meteorological_equations.math.solvers._solvers import Solver
 from meteorological_equations.shared._enum_tools import parse_enum
 from meteorological_equations.math.solvers._enums import MethodType, SolverName
 from meteorological_equations.math.solvers.core import SolverMap
@@ -71,6 +72,141 @@ def _use_back_up_solvers(
         
     else:
         return results
+
+
+def __try_back_up_vectorised(
+
+    func: Callable[[float], float],
+    results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
+    a: Optional[Union[npt.ArrayLike, float]],
+    b: Optional[Union[npt.ArrayLike, float]],
+    x0: Optional[Union[npt.ArrayLike, float]],
+    tol: float,
+    max_iter: int,
+    func_prime: Optional[Callable[[float], float]] = None,
+    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
+    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION],       
+):
+    """
+    Docstring for __try_back_up_vectorised
+    
+    :param func: Description
+    :type func: Callable[[float], float]
+    :param results: Description
+    :type results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]]
+    :param a: Description
+    :type a: Optional[Union[npt.ArrayLike, float]]
+    :param b: Description
+    :type b: Optional[Union[npt.ArrayLike, float]]
+    :param x0: Description
+    :type x0: Optional[Union[npt.ArrayLike, float]]
+    :param tol: Description
+    :type tol: float
+    :param max_iter: Description
+    :type max_iter: int
+    :param func_prime: Description
+    :type func_prime: Optional[Callable[[float], float]]
+    :param func_params: Description
+    :type func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]]
+    :param backup_solvers: Description
+    :type backup_solvers: List[Union[str, MethodType]]
+    """
+    roots, iterations, converged_flag = results
+
+    unconverged_mask = not converged_flag
+    unconverged_idx = np.where(unconverged_mask)[0]
+    
+    if np.all(converged_flag):
+        return results
+    
+    for backup_solver_name in backup_solvers:
+        
+        backup_solver_enum = parse_enum(backup_solver_name, SolverName)        
+        back_up_solver_class = SolverMap[backup_solver_enum]
+        back_up_solver = back_up_solver_class()
+
+        method_type = back_up_solver.get_method_type()
+
+        if method_type == MethodType.HYBRID:
+
+            if x0 is not None:
+                
+                try:
+                    x0 = np.asarray(x0, dtype=np.float64)
+                    
+                    x0_unconverged = x0[unconverged_idx]
+                    
+                    
+                    if func_params is not None:
+                        func_params = np.asarray(func_params, dtype=np.float64)
+                        func_params_unconverged = func_params[unconverged_idx]
+                    
+                    else:
+                        func_params_unconverged = None
+
+                    updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+                        func=func,
+                        func_prime=func_prime,
+                        func_params=func_params_unconverged,
+                        x0=x0_unconverged,
+                        tol=tol,
+                        max_iter=max_iter
+                    )
+
+                    newly_converged_mask = updated_converged_flag
+                    newly_converged_original_idx = unconverged_idx[newly_converged_mask]
+
+                    roots[newly_converged_original_idx] = updated_roots[newly_converged_mask]
+                    iterations[newly_converged_original_idx] = updated_iterations[newly_converged_mask]
+                    converged_flag[newly_converged_original_idx] = True
+                
+                except Exception as e:
+                    warnings.warn(f"{backup_solver_enum.value} did not converge. Skipping to the next solver")
+
+                
+
+        if method_type == MethodType.OPEN:
+
+            try:
+                x0 = np.asarray(x0, dtype=np.float64)
+                x0_unconverged = x0[unconverged_idx]
+                func_params_unconverged = func_params[unconverged_idx]
+                
+                updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+                    func=func,
+                    func_prime=func_prime,
+                    func_params=func_params_unconverged,
+                    x0=x0_unconverged,
+                    tol=tol,
+                    max_iter=max_iter
+                )
+            
+            except:
+                if method_type == MethodType.OPEN:
+
+                    pass
+                continue
+
+            results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
+            
+        if method_type == (MethodType.HYBRID or MethodType.BRACKET):
+            a = np.asarray(a, dtype=np.float64)
+            b = np.asarray(b, dtype=np.float64)
+            func_params_unconverged = func_params[unconverged_idx]
+
+            updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+                func=func,
+                a=a,
+                b=b,
+                func_params=func_params,
+                tol=tol,
+                max_iter=max_iter
+            )
+
+        
+        results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
+        unconverged_mask = not(converged_flag)
+        unconverged_idx = np.where(unconverged_mask)[0]
 
 
 
@@ -179,3 +315,49 @@ def _try_back_up_scalar(
             warnings.warn("Unknown method type. Skipping to the next solver")
         
     return results
+
+
+def _try_back_up_bracket_vectorised(
+    back_up_solver: Solver,
+    func: Callable[[float], float],
+    results: Tuple[npt.NDArray, npt.NDArray, npt.NDArray],
+    a: npt.ArrayLike,
+    b: npt.ArrayLike,
+    unconverged_idx: npt.ArrayLike,
+    tol: float,
+    max_iter: int,
+    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
+        
+):
+    """
+    Docstring for __try_back_up_bracket
+    
+    """
+
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+
+    a_unconverged = a[unconverged_idx]
+    b_unconverged = b[unconverged_idx]
+
+def _get_unconverged_func_params(
+        func_params: Optional[Union[npt.ArrayLike, Tuple[float, ...]]],
+        unconverged_idx: npt.ArrayLike
+) -> Optional[npt.NDArray]:
+    """
+    Extracts the unconverged function parameters if not None.
+
+    Args:
+        - func_params (Optional[Union[npt.ArrayLike, Tuple[float, ...]]]) = function parameters which is either None or array of tuples
+        - unconverged_idx = position of function params that have not converged
+    
+    
+    Returns:
+        - function parameters or None 
+
+    """
+    if func_params is not None:
+        func_params = np.asarray(func_params, dtype=np.float64)
+        return func_params[unconverged_idx]
+    
+    return None
