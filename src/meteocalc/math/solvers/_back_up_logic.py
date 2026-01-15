@@ -361,3 +361,26 @@ def _get_unconverged_func_params(
         return func_params[unconverged_idx]
     
     return None
+
+def _update_converged_results(
+    roots: npt.NDArray,
+    iterations: npt.NDArray,
+    converged_flag: npt.NDArray,
+    unconverged_idx: npt.NDArray,
+    updated_roots: npt.NDArray,
+    updated_iterations: npt.NDArray,
+    updated_converged_flag: npt.NDArray
+) -> None:
+    """
+    Updates only the positions that have converged
+
+    Args:
+        - root
+    """
+    updated_converged_mask = updated_converged_flag
+    updated_converged_original_idx = unconverged_idx[updated_converged_mask]
+    
+    
+    roots[updated_converged_original_idx] = updated_roots[updated_converged_mask]
+    iterations[updated_converged_original_idx] = updated_iterations[updated_converged_mask]
+    converged_flag[updated_converged_original_idx] = True
