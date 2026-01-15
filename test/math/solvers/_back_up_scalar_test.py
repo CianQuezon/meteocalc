@@ -14,8 +14,7 @@ from scipy import optimize
 from numba import njit
 
 from meteorological_equations.math.solvers._enums import SolverName
-from meteorological_equations.math.solvers.core import RootSolvers
-
+from meteorological_equations.math.solvers._back_up_logic import _try_back_up_scalar
 
 # =============================================================================
 # NUMBA-COMPATIBLE TEST FUNCTIONS
@@ -122,7 +121,7 @@ class TestDirectScipyComparison:
         a, b = 0.0, 5.0
         
         # Your implementation (uses @njit function)
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=quadratic_func,  # ✅ Numba-compatible
             results=failed_results,
             a=a,
@@ -149,7 +148,7 @@ class TestDirectScipyComparison:
         a, b = 0.0, 2.0
         
         # Your implementation
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=cubic_func,
             results=failed_results,
             a=a,
@@ -173,7 +172,7 @@ class TestDirectScipyComparison:
         failed_results = (0.5, 100, False)
         a, b = 0.0, 1.5
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=transcendental_func,
             results=failed_results,
             a=a,
@@ -196,7 +195,7 @@ class TestDirectScipyComparison:
         failed_results = (0.5, 100, False)
         a, b = 0.0, 2.0
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=exponential_func,
             results=failed_results,
             a=a,
@@ -219,7 +218,7 @@ class TestDirectScipyComparison:
         failed_results = (1.5, 100, False)
         a, b = 1.5, 2.5
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=polynomial_func,
             results=failed_results,
             a=a,
@@ -242,7 +241,7 @@ class TestDirectScipyComparison:
         failed_results = (3.0, 100, False)
         a, b = 3.0, 3.3
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=sine_func,
             results=failed_results,
             a=a,
@@ -272,7 +271,7 @@ class TestBisectionVsScipy:
         failed_results = (0.0, 100, False)
         a, b = 0.0, 5.0
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=quadratic_func,
             results=failed_results,
             a=a,
@@ -295,7 +294,7 @@ class TestBisectionVsScipy:
         failed_results = (1.0, 100, False)
         a, b = 0.0, 2.0
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=cubic_func,
             results=failed_results,
             a=a,
@@ -336,7 +335,7 @@ class TestPrecisionVsScipy:
             return x**2 - 2
         
         # Your implementation
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=sqrt_func,
             results=failed_results,
             a=a,
@@ -384,7 +383,7 @@ class TestEdgeCases:
         failed_results = (0.0, 100, False)
         a, b = 0.0, 2.0  # Root at b
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=boundary_func,
             results=failed_results,
             a=a,
@@ -407,7 +406,7 @@ class TestEdgeCases:
         failed_results = (0.5, 100, False)
         a, b = 0.5, 1.5
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=steep_func,
             results=failed_results,
             a=a,
@@ -429,7 +428,7 @@ class TestEdgeCases:
         failed_results = (0.0, 100, False)
         a, b = 0.0, 2.0
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=flat_func,
             results=failed_results,
             a=a,
@@ -476,7 +475,7 @@ class TestComprehensiveReport:
             
             # Your implementation
             try:
-                result = RootSolvers._RootSolvers__try_back_up_scalar(
+                result = _try_back_up_scalar(
                     func=func_numba,
                     results=failed_results,
                     a=a, b=b, x0=(a+b)/2,
@@ -530,7 +529,7 @@ class TestBasicFunctionality:
         """Already converged should return immediately"""
         converged_results = (2.0, 5, True)
         
-        result = RootSolvers._RootSolvers__try_back_up_scalar(
+        result = _try_back_up_scalar(
             func=quadratic_func,
             results=converged_results,
             a=0.0, b=5.0, x0=1.0,
@@ -552,7 +551,7 @@ class TestBasicFunctionality:
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            result = RootSolvers._RootSolvers__try_back_up_scalar(
+            result = _try_back_up_scalar(
                 func=no_roots_func,
                 results=failed_results,
                 a=-10.0, b=10.0, x0=0.0,
