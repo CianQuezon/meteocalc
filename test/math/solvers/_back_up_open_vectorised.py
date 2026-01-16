@@ -132,8 +132,17 @@ class TestTryBackupOpenVectorised:
         # Verify
         assert success == True, "Should return True if any converged"
         assert np.all(converged), "All should have converged"
-        assert np.all(np.abs(roots - 2.0) < 1e-5), f"All roots should be near 2.0, got {roots}"
-    
+        
+        # x^2 - 4 = 0 has TWO roots: +2 and -2
+        # Positive x0 → +2, Negative x0 → -2
+        expected_roots = np.array([2.0, 2.0, -2.0, 2.0, -2.0])
+        assert np.allclose(roots, expected_roots, atol=1e-5), \
+            f"Expected {expected_roots}, got {roots}"
+        
+        # Alternative: check that all roots satisfy x^2 - 4 = 0
+        residuals = roots**2 - 4
+        assert np.all(np.abs(residuals) < 1e-10), \
+            f"All roots should satisfy f(x)=0, residuals: {residuals}"
     
     def test_partial_convergence(self):
         """Test case where only some elements converge"""
