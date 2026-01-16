@@ -74,7 +74,7 @@ def _use_back_up_solvers(
         return results
 
 
-def __try_back_up_vectorised(
+def _try_back_up_vectorised(
 
     func: Callable[[float], float],
     results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
@@ -326,19 +326,110 @@ def _try_back_up_bracket_vectorised(
     unconverged_idx: npt.ArrayLike,
     tol: float,
     max_iter: int,
-    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
+    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]],
         
-):
+) -> bool:
     """
     Docstring for __try_back_up_bracket
     
     """
 
-    a = np.asarray(a, dtype=np.float64)
-    b = np.asarray(b, dtype=np.float64)
+    try: 
+        original_roots = results[0]
+        original_iterations = results[1]
+        original_converged_flag = results[2]
 
-    a_unconverged = a[unconverged_idx]
-    b_unconverged = b[unconverged_idx]
+        a = np.asarray(a, dtype=np.float64)
+        b = np.asarray(b, dtype=np.float64)
+
+        a_unconverged = a[unconverged_idx]
+        b_unconverged = b[unconverged_idx]
+
+        func_params_unconverged = _get_unconverged_func_params(
+            func_params=func_params, unconverged_idx=unconverged_idx
+        )
+
+        updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+            func=func,
+            a=a_unconverged,
+            b=b_unconverged,
+            func_params=func_params_unconverged,
+            tol=tol,
+            max_iter=max_iter
+        )
+
+        _update_converged_results(
+            roots=original_roots,
+            iterations=original_iterations,
+            converged_flag=original_converged_flag,
+            unconverged_idx=unconverged_idx,
+            updated_roots=updated_roots,
+            updated_iterations=updated_iterations,
+            updated_converged_flag=updated_converged_flag
+        )
+
+        return np.any(updated_converged_flag)
+
+    except Exception as e:             
+        warnings.warn(f"Bracketing method failed: {e}. Skipping to the next solver.")
+        return False
+
+
+def _try_back_up_open_vectorised(
+    back_up_solver: Solver,
+    func: Callable[[float], float],
+    results: Tuple[npt.NDArray, npt.NDArray, npt.NDArray],
+    x0: npt.ArrayLike,
+    unconverged_idx: npt.ArrayLike,
+    tol: float,
+    max_iter: int,
+    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]],
+    func_prime: Optional[Callable[[float], float]]
+) -> bool:
+    """
+    Docstring for _try_back_up_open_vectorised
+
+    """
+
+    try:
+
+        original_roots = results[0]
+        original_iterations = results[1]
+        original_converged_flag = results[2]
+
+        x0 = np.asarray(x0, dtype=np.float64)
+        x0_unconverged = x0[unconverged_idx]
+
+        func_params_unconverged = _get_unconverged_func_params(
+            func_params=func_params,
+            unconverged_idx=unconverged_idx
+        ) 
+
+        updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
+            func=func,
+            func_prime=func_prime,
+            x0=x0_unconverged,
+            func_params=func_params_unconverged,
+            tol=tol,
+            max_iter=max_iter
+        )
+
+        _update_converged_results(
+            roots=original_roots,
+            iterations=original_iterations,
+            converged_flag=original_converged_flag,
+            unconverged_idx=unconverged_idx,
+            updated_roots=updated_roots,
+            updated_iterations=updated_iterations,
+            updated_converged_flag=updated_converged_flag
+        )
+
+        return np.any(updated_converged_flag)
+
+    except Exception as e:
+        warnings.warn(f"Open method failed: {e}")
+        return False
+
 
 def _get_unconverged_func_params(
         func_params: Optional[Union[npt.ArrayLike, Tuple[float, ...]]],
