@@ -249,7 +249,8 @@ def _try_back_up_vectorised(
                     try:
                         success_flag = _try_back_up_open_vectorised(
                             back_up_solver=backup_solver,  func=func, results=results,
-                            x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, tol=tol, max_iter=max_iter
+                            x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, 
+                            func_prime=func_prime, tol=tol, max_iter=max_iter
                         )
 
                         if success_flag:
