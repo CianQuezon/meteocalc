@@ -131,7 +131,9 @@ def func_five_params(x: float, p0: float, p1: float, p2: float, p3: float, p4: f
 
 
 @njit
-def func_five_params_derivative(x: float, p0: float, p1: float, p2: float, p3: float, _p4: float) -> float:
+def func_five_params_derivative(
+    x: float, p0: float, p1: float, p2: float, p3: float, _p4: float
+) -> float:
     """Derivative: 4*p0*x^3 + 3*p1*x^2 + 2*p2*x + p3"""
     return 4 * p0 * x**3 + 3 * p1 * x**2 + 2 * p2 * x + p3
 
@@ -194,9 +196,7 @@ class TestScalarNoParameters:
 
     def test_bisection_polynomial_scalar(self, bisection_solver):
         """Bisection on polynomial equation (no params)"""
-        root, iters, converged = bisection_solver.find_root(
-            polynomial_func, a=2.0, b=3.0, tol=1e-6
-        )
+        root, iters, converged = bisection_solver.find_root(polynomial_func, a=2.0, b=3.0, tol=1e-6)
         scipy_root = optimize.bisect(lambda x: x**3 - 2 * x - 5, a=2.0, b=3.0, xtol=1e-6)
 
         assert converged
@@ -204,9 +204,7 @@ class TestScalarNoParameters:
 
     def test_brent_exponential_scalar(self, brent_solver):
         """Brent's method on exponential equation (no params)"""
-        root, iters, converged = brent_solver.find_root(
-            exponential_func, a=0.3, b=1.5, tol=1e-6
-        )
+        root, iters, converged = brent_solver.find_root(exponential_func, a=0.3, b=1.5, tol=1e-6)
         scipy_root = optimize.brentq(lambda x: np.exp(x) - 3 * x, a=0.3, b=1.5, xtol=1e-6)
 
         assert converged
@@ -227,9 +225,7 @@ class TestScalarWithParameters:
         root, iters, converged = newton_solver.find_root(
             func_one_param, func_one_param_derivative, x0=2.0, func_params=(k,), tol=1e-6
         )
-        scipy_root = optimize.newton(
-            lambda x: x**2 - k, x0=2.0, fprime=lambda x: 2 * x, tol=1e-6
-        )
+        scipy_root = optimize.newton(lambda x: x**2 - k, x0=2.0, fprime=lambda x: 2 * x, tol=1e-6)
 
         assert converged
         assert np.abs(root - scipy_root) < 1e-6
@@ -355,7 +351,9 @@ class TestVectorizedNoParameters:
 
         scipy_roots = np.array(
             [
-                optimize.newton(lambda x: x**3 - 2 * x - 5, x0=x0, fprime=lambda x: 3 * x**2 - 2, tol=1e-6)
+                optimize.newton(
+                    lambda x: x**3 - 2 * x - 5, x0=x0, fprime=lambda x: 3 * x**2 - 2, tol=1e-6
+                )
                 for x0 in x0_array
             ]
         )
@@ -420,7 +418,9 @@ class TestVectorizedWithParameters:
 
         scipy_roots = np.array(
             [
-                optimize.newton(lambda x, k=k: x**2 - k, x0=x0_array[i], fprime=lambda x: 2 * x, tol=1e-6)
+                optimize.newton(
+                    lambda x, k=k: x**2 - k, x0=x0_array[i], fprime=lambda x: 2 * x, tol=1e-6
+                )
                 for i, k in enumerate(k_values)
             ]
         )
@@ -644,6 +644,7 @@ class TestEdgeCases:
 
     def test_mixed_convergence_with_params(self, newton_solver):
         """Test mixed convergence with parameters"""
+
         # f(x, offset) = x^2 + offset
         # Negative offset: has real roots
         # Positive offset: no real roots
@@ -785,6 +786,9 @@ def test_brent_multiple_equations_no_params(func, a, b, expected_root):
 )
 def test_newton_parametrized_with_params(num_params, k_value):
     """Parametrized test for Newton with parameters"""
+
+    _ = num_params
+
     solver = NewtonRaphsonSolver()
     root, iters, converged = solver.find_root(
         func_one_param,
