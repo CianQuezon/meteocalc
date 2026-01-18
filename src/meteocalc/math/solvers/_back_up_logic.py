@@ -26,22 +26,162 @@ def _use_back_up_solvers(
     max_iter: int,
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION]
+    backup_solvers: List[Union[str, MethodType]] = None
 ) -> Union[
     Tuple[float, int, bool],
     Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
 ]:
     """
-    Uses backup solvers for functions that has not converged if use_backups is true.
+    Apply backup solvers to unconverged root-finding results.
+    
+    Dispatches to scalar or vectorized backup solver logic based on input
+    dimensionality. Automatically tries a chain of fallback methods (default:
+    Brent's method, then bisection) to improve convergence rates when the
+    primary solver fails.
+    
+    This function serves as the main entry point for the backup solver system,
+    determining whether to use scalar or vectorized processing and delegating
+    to the appropriate handler.
+    
+    Parameters
+    ----------
+    func : Callable[[float], float]
+        The function for which to find roots. Must accept a float and return
+        a float. For vectorized operations, will be called element-wise.
+        Should satisfy f(x) = 0 at the root.
+    results : tuple
+        Results from the primary solver attempt. Can be either:
+        - Scalar: (root, iterations, converged) where types are (float, int, bool)
+        - Vectorized: (roots, iterations, converged) where types are (ndarray, ndarray, ndarray)
+    a : float or array_like, optional
+        Lower bracket bound(s). Required for bracket-based methods (Brent, bisection).
+        - Scalar: single float value
+        - Vectorized: array of floats, one per element
+        If None, bracket methods will be skipped in the fallback chain.
+    b : float or array_like, optional
+        Upper bracket bound(s). Required for bracket-based methods.
+        Must satisfy func(a) * func(b) < 0 for each bracket pair.
+        If None, bracket methods will be skipped.
+    x0 : float or array_like, optional
+        Initial guess(es) for root location. Required for open methods (Newton-Raphson).
+        - Scalar: single float value
+        - Vectorized: array of floats, one per element
+        If None, open methods will be skipped in the fallback chain.
+    tol : float
+        Convergence tolerance. Solver stops when |f(x)| < tol or when the
+        change in x between iterations is less than tol.
+    max_iter : int
+        Maximum number of iterations allowed per solver attempt.
+    func_prime : Callable[[float], float], optional
+        Derivative of func. Required for derivative-based methods like Newton-Raphson.
+        If None, only derivative-free methods will be used. Default is None.
+    func_params : array_like or tuple of floats, optional
+        Additional parameters to pass to func and func_prime. For vectorized
+        operations, should be a 2D array where each row corresponds to parameters
+        for one element. Default is None.
+    backup_solvers : list of str or SolverName, optional
+        Ordered list of backup solvers to try. Each solver is attempted in
+        sequence until convergence or list exhaustion. Default is [BRENT, BISECTION].
+        Available solvers: BRENT, BISECTION, NEWTON_RAPHSON, SECANT, REGULA_FALSI.
+    
+    Returns
+    -------
+    results : tuple
+        Updated results with the same structure as input:
+        - Scalar: (root, iterations, converged) as (float, int, bool)
+        - Vectorized: (roots, iterations, converged) as (ndarray, ndarray, ndarray)
         
-    Args:
-        - a (Optional[Union[ArrayLike, float]]) = Array or a acalar of upper bound brackets
-        - b (Optional[Union[ArrayLike, float]]) = Array or a scalar of lower bound brackets
-        - x0 (Optional[Union[ArrayLike, float]]) = Array or a scalar of inital guesses 
-        
-    Returns:
-        An array or a scalar of (float, int, bool)
-    """     
+        For vectorized results:
+        - roots: Array of root values (NaN for unconverged elements)
+        - iterations: Array of iteration counts
+        - converged: Boolean array indicating convergence status
+    
+    Notes
+    -----
+    - The function automatically detects scalar vs. vectorized inputs based on
+      the dimensionality of the results tuple
+    - For vectorized inputs, backup solvers are applied only to unconverged elements,
+      preserving already-converged results
+    - Hybrid solvers (e.g., Brent) will try both open and bracket interfaces if
+      both x0 and (a, b) are provided
+    - If all backup solvers fail, the function returns the input results unchanged
+      with appropriate warnings
+    
+    Examples
+    --------
+    Scalar usage with bracket methods:
+    
+    >>> def f(x):
+    ...     return x**3 - 8
+    >>> 
+    >>> # Primary solver failed
+    >>> results = (np.nan, 100, False)
+    >>> 
+    >>> # Try backup solvers with brackets
+    >>> root, iters, converged = _use_back_up_solvers(
+    ...     func=f,
+    ...     results=results,
+    ...     a=0.0,
+    ...     b=5.0,
+    ...     x0=None,
+    ...     tol=1e-6,
+    ...     max_iter=100
+    ... )
+    >>> print(f"Root: {root:.6f}, Converged: {converged}")
+    Root: 2.000000, Converged: True
+    
+    Vectorized usage with mixed convergence:
+    
+    >>> def f(x):
+    ...     return x**3 - 8
+    >>> 
+    >>> # Some elements converged, some didn't
+    >>> roots = np.array([2.0, np.nan, np.nan])
+    >>> iters = np.array([8, 100, 100])
+    >>> conv = np.array([True, False, False])
+    >>> 
+    >>> # Apply backup solvers to unconverged elements only
+    >>> roots, iters, conv = _use_back_up_solvers(
+    ...     func=f,
+    ...     results=(roots, iters, conv),
+    ...     a=np.array([0, 0, 0]),
+    ...     b=np.array([5, 5, 5]),
+    ...     x0=None,
+    ...     tol=1e-6,
+    ...     max_iter=100
+    ... )
+    >>> print(conv)
+    [True True True]
+    
+    Using custom backup solver chain:
+    
+    >>> from meteorological_equations.math.solvers import SolverName
+    >>> 
+    >>> # Try Newton first, then Brent, then bisection
+    >>> results = _use_back_up_solvers(
+    ...     func=f,
+    ...     results=(np.nan, 100, False),
+    ...     a=0.0,
+    ...     b=5.0,
+    ...     x0=2.5,
+    ...     tol=1e-8,
+    ...     max_iter=50,
+    ...     func_prime=lambda x: 3*x**2,
+    ...     backup_solvers=[
+    ...         SolverName.NEWTON_RAPHSON,
+    ...         SolverName.BRENT,
+    ...         SolverName.BISECTION
+    ...     ]
+    ... )
+    
+    See Also
+    --------
+    _try_back_up_scalar : Scalar backup solver implementation
+    _try_back_up_vectorised : Vectorized backup solver implementation
+    """  
+
+    if backup_solvers is None:
+        backup_solvers = [SolverName.BRENT, SolverName.BISECTION]
 
     roots = np.asarray(results[0])
     iterations = np.asarray(results[1])
@@ -71,29 +211,254 @@ def _use_back_up_solvers(
         )
         
     else:
-        return results
+        
+        return _try_back_up_vectorised(
+            func=func,
+            results=results,
+            a=a,
+            b=b,
+            x0=x0,
+            tol=tol,
+            max_iter=max_iter,
+            func_prime=func_prime,
+            func_params=func_params,
+            backup_solvers=backup_solvers
+        )
 
 
 
 
 def _try_back_up_scalar(
     func: Callable[[float], float],
-    results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
-    a: Optional[Union[npt.ArrayLike, float]],
-    b: Optional[Union[npt.ArrayLike, float]],
-    x0: Optional[Union[npt.ArrayLike, float]],
+    results: Tuple[float, int, bool],
+    a: Optional[float],
+    b: Optional[float],
+    x0: Optional[float],
     tol: float,
     max_iter: int,
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION],
+    backup_solvers: List[Union[str, MethodType]] = None,
             
     ):
     """
-    Docstring for __dispatch_back_up_scalar
-
+    Apply a chain of backup solvers to a single unconverged root-finding result.
+    
+    Iterates through a sequence of backup solvers, attempting each in order until
+    one successfully converges or all are exhausted. Handles different solver types
+    (open, bracket, hybrid) and gracefully skips solvers when required inputs are
+    missing.
+    
+    This function is designed for scalar (single-value) operations. For vectorized
+    operations on arrays, use `_try_back_up_vectorised` instead.
+    
+    Parameters
+    ----------
+    func : Callable[[float], float]
+        The function for which to find a root. Must accept a single float argument
+        and return a float. The solver seeks x such that func(x) = 0.
+    results : tuple of (float, int, bool)
+        Results from the primary solver attempt:
+        - results[0]: Root value (may be NaN if unconverged)
+        - results[1]: Number of iterations used
+        - results[2]: Convergence flag (True if converged, False otherwise)
+    a : float, optional
+        Lower bracket bound. Required for bracket-based methods (Brent, bisection,
+        regula falsi). Must satisfy func(a) * func(b) < 0. If None, bracket methods
+        are skipped.
+    b : float, optional
+        Upper bracket bound. Required for bracket-based methods. If None, bracket
+        methods are skipped.
+    x0 : float, optional
+        Initial guess for the root location. Required for open methods (Newton-Raphson,
+        secant). Should be reasonably close to the actual root for best convergence.
+        If None, open methods are skipped.
+    tol : float
+        Convergence tolerance. The solver stops when |func(x)| < tol or when the
+        change in x between iterations falls below tol. Typical values: 1e-6 to 1e-12.
+    max_iter : int
+        Maximum number of iterations allowed for each solver attempt. If exceeded,
+        the solver is considered to have failed and the next backup is tried.
+    func_prime : Callable[[float], float], optional
+        Derivative of func with respect to x. Required for derivative-based methods
+        like Newton-Raphson. Must return df/dx at the given point. If None,
+        derivative-based methods are skipped. Default is None.
+    func_params : tuple of floats, optional
+        Additional parameters to pass to func and func_prime. These are passed as
+        positional arguments after x. For example, if func_params=(a, b), then
+        func is called as func(x, a, b). Default is None.
+    backup_solvers : list of str or SolverName, optional
+        Ordered sequence of backup solvers to try. Each solver is attempted in the
+        order specified until one converges. Default is [SolverName.BRENT, 
+        SolverName.BISECTION].
+        
+        Available solvers:
+        - BRENT: Hybrid method combining bisection, secant, and inverse quadratic
+        - BISECTION: Reliable bracket method, always converges but slower
+        - NEWTON_RAPHSON: Fast open method requiring derivative
+        - SECANT: Open method approximating derivative
+        - REGULA_FALSI: Bracket method, alternative to bisection
+    
+    Returns
+    -------
+    results : tuple of (float, int, bool)
+        Updated results after attempting backup solvers:
+        - results[0]: Root value (solution to func(x) = 0, or NaN if all failed)
+        - results[1]: Total iterations used (cumulative across attempts)
+        - results[2]: Convergence status (True if any solver succeeded, False otherwise)
+    
+    Notes
+    -----
+    Solver Selection Logic:
+    - HYBRID solvers (e.g., Brent): Try open interface first if x0 provided, then
+      bracket interface if (a, b) provided
+    - BRACKET solvers: Require both a and b; skipped if either is None
+    - OPEN solvers: Require x0; skipped if None
+    
+    Error Handling:
+    - If a solver raises an exception, a warning is issued and the next solver is tried
+    - If a solver converges (results[2] == True), iteration stops and results are returned
+    - If all solvers fail or are skipped, the original results are returned unchanged
+    
+    The function returns immediately upon first successful convergence. This means
+    earlier solvers in the chain are preferred, so order matters.
+    
+    Performance Considerations:
+    - Brent's method is usually fastest for well-behaved functions
+    - Bisection is slowest but most reliable
+    - Newton-Raphson is very fast when close to the root with good derivative
+    
+    Examples
+    --------
+    Basic usage with bracket methods:
+    
+    >>> def f(x):
+    ...     return x**3 - 8
+    >>> 
+    >>> # Primary solver failed
+    >>> results = (np.nan, 100, False)
+    >>> 
+    >>> # Try backup solvers
+    >>> root, iters, converged = _try_back_up_scalar(
+    ...     func=f,
+    ...     results=results,
+    ...     a=0.0,
+    ...     b=5.0,
+    ...     x0=None,
+    ...     tol=1e-6,
+    ...     max_iter=100
+    ... )
+    >>> 
+    >>> print(f"Root: {root:.6f}")
+    Root: 2.000000
+    >>> print(f"Converged: {converged}")
+    Converged: True
+    >>> print(f"Iterations: {iters}")
+    Iterations: 8
+    
+    Using Newton-Raphson with derivative:
+    
+    >>> def f(x):
+    ...     return x**2 - 4
+    >>> 
+    >>> def f_prime(x):
+    ...     return 2 * x
+    >>> 
+    >>> results = (np.nan, 50, False)
+    >>> 
+    >>> root, iters, converged = _try_back_up_scalar(
+    ...     func=f,
+    ...     results=results,
+    ...     a=None,  # Not needed for Newton
+    ...     b=None,
+    ...     x0=1.5,  # Initial guess
+    ...     tol=1e-10,
+    ...     max_iter=50,
+    ...     func_prime=f_prime,
+    ...     backup_solvers=[SolverName.NEWTON_RAPHSON, SolverName.BRENT]
+    ... )
+    >>> 
+    >>> print(f"Root: {root:.10f}")
+    Root: 2.0000000000
+    
+    Custom solver chain:
+    
+    >>> from meteorological_equations.math.solvers import SolverName
+    >>> 
+    >>> # Try Newton first, then secant, finally bisection as last resort
+    >>> custom_chain = [
+    ...     SolverName.NEWTON_RAPHSON,
+    ...     SolverName.SECANT,
+    ...     SolverName.BISECTION
+    ... ]
+    >>> 
+    >>> results = _try_back_up_scalar(
+    ...     func=f,
+    ...     results=(np.nan, 100, False),
+    ...     a=0.0,
+    ...     b=5.0,
+    ...     x0=2.5,
+    ...     tol=1e-8,
+    ...     max_iter=50,
+    ...     func_prime=f_prime,
+    ...     backup_solvers=custom_chain
+    ... )
+    
+    With function parameters:
+    
+    >>> def parametric_func(x, a, b):
+    ...     return a * x**2 + b
+    >>> 
+    >>> def parametric_prime(x, a, b):
+    ...     return 2 * a * x
+    >>> 
+    >>> # Solve a*x^2 + b = 0 with a=1, b=-4
+    >>> root, iters, converged = _try_back_up_scalar(
+    ...     func=parametric_func,
+    ...     results=(np.nan, 100, False),
+    ...     a=-3.0,
+    ...     b=3.0,
+    ...     x0=1.0,
+    ...     tol=1e-6,
+    ...     max_iter=100,
+    ...     func_prime=parametric_prime,
+    ...     func_params=(1.0, -4.0)
+    ... )
+    >>> print(f"Root: {root:.6f}")
+    Root: 2.000000
+    
+    Handling already-converged results:
+    
+    >>> # Primary solver succeeded
+    >>> results = (2.0, 5, True)
+    >>> 
+    >>> # Function returns immediately without trying backups
+    >>> root, iters, converged = _try_back_up_scalar(
+    ...     func=f, results=results, a=0.0, b=5.0, x0=None,
+    ...     tol=1e-6, max_iter=100
+    ... )
+    >>> 
+    >>> print(f"Root: {root}, Iterations: {iters}")
+    Root: 2.0, Iterations: 5
+    >>> # Original results returned unchanged
+    
+    See Also
+    --------
+    _try_back_up_vectorised : Vectorized version for arrays of values
+    _use_back_up_solvers : Main dispatcher function
+    
+    Warnings
+    --------
+    - If no solvers can be applied (e.g., x0, a, and b are all None), the function
+      returns the original unconverged results with warnings
+    - Bracket methods require func(a) * func(b) < 0, otherwise they will fail
+    - Newton-Raphson can diverge if the initial guess is far from the root or if
+      the derivative is zero
     """
     converged_flag = results[2]
+
+    if backup_solvers is None:
+        backup_solvers = [SolverName.BRENT, SolverName.BISECTION]
 
     if converged_flag:
         return results
@@ -192,7 +557,7 @@ def _try_back_up_vectorised(
     max_iter: int,
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION],       
+    backup_solvers: List[Union[str, MethodType]] = None,       
 ):
     """
     Docstring for __try_back_up_vectorised
@@ -219,6 +584,9 @@ def _try_back_up_vectorised(
     :type backup_solvers: List[Union[str, MethodType]]
     """
     roots, iterations, converged_flag = results
+
+    if backup_solvers is None:
+        backup_solvers = [SolverName.BRENT, SolverName.BISECTION]
 
     if np.all(converged_flag):
         return results
