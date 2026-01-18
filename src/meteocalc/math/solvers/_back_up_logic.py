@@ -74,142 +74,6 @@ def _use_back_up_solvers(
         return results
 
 
-def _try_back_up_vectorised(
-
-    func: Callable[[float], float],
-    results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
-    a: Optional[Union[npt.ArrayLike, float]],
-    b: Optional[Union[npt.ArrayLike, float]],
-    x0: Optional[Union[npt.ArrayLike, float]],
-    tol: float,
-    max_iter: int,
-    func_prime: Optional[Callable[[float], float]] = None,
-    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION],       
-):
-    """
-    Docstring for __try_back_up_vectorised
-    
-    :param func: Description
-    :type func: Callable[[float], float]
-    :param results: Description
-    :type results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]]
-    :param a: Description
-    :type a: Optional[Union[npt.ArrayLike, float]]
-    :param b: Description
-    :type b: Optional[Union[npt.ArrayLike, float]]
-    :param x0: Description
-    :type x0: Optional[Union[npt.ArrayLike, float]]
-    :param tol: Description
-    :type tol: float
-    :param max_iter: Description
-    :type max_iter: int
-    :param func_prime: Description
-    :type func_prime: Optional[Callable[[float], float]]
-    :param func_params: Description
-    :type func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]]
-    :param backup_solvers: Description
-    :type backup_solvers: List[Union[str, MethodType]]
-    """
-    roots, iterations, converged_flag = results
-
-    unconverged_mask = not converged_flag
-    unconverged_idx = np.where(unconverged_mask)[0]
-    
-    if np.all(converged_flag):
-        return results
-    
-    for backup_solver_name in backup_solvers:
-        
-        backup_solver_enum = parse_enum(backup_solver_name, SolverName)        
-        back_up_solver_class = SolverMap[backup_solver_enum]
-        back_up_solver = back_up_solver_class()
-
-        method_type = back_up_solver.get_method_type()
-
-        if method_type == MethodType.HYBRID:
-
-            if x0 is not None:
-                
-                try:
-                    x0 = np.asarray(x0, dtype=np.float64)
-                    
-                    x0_unconverged = x0[unconverged_idx]
-                    
-                    
-                    if func_params is not None:
-                        func_params = np.asarray(func_params, dtype=np.float64)
-                        func_params_unconverged = func_params[unconverged_idx]
-                    
-                    else:
-                        func_params_unconverged = None
-
-                    updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
-                        func=func,
-                        func_prime=func_prime,
-                        func_params=func_params_unconverged,
-                        x0=x0_unconverged,
-                        tol=tol,
-                        max_iter=max_iter
-                    )
-
-                    newly_converged_mask = updated_converged_flag
-                    newly_converged_original_idx = unconverged_idx[newly_converged_mask]
-
-                    roots[newly_converged_original_idx] = updated_roots[newly_converged_mask]
-                    iterations[newly_converged_original_idx] = updated_iterations[newly_converged_mask]
-                    converged_flag[newly_converged_original_idx] = True
-                
-                except Exception as e:
-                    warnings.warn(f"{backup_solver_enum.value} did not converge. Skipping to the next solver")
-
-                
-
-        if method_type == MethodType.OPEN:
-
-            try:
-                x0 = np.asarray(x0, dtype=np.float64)
-                x0_unconverged = x0[unconverged_idx]
-                func_params_unconverged = func_params[unconverged_idx]
-                
-                updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
-                    func=func,
-                    func_prime=func_prime,
-                    func_params=func_params_unconverged,
-                    x0=x0_unconverged,
-                    tol=tol,
-                    max_iter=max_iter
-                )
-            
-            except:
-                if method_type == MethodType.OPEN:
-
-                    pass
-                continue
-
-            results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
-            
-        if method_type == (MethodType.HYBRID or MethodType.BRACKET):
-            a = np.asarray(a, dtype=np.float64)
-            b = np.asarray(b, dtype=np.float64)
-            func_params_unconverged = func_params[unconverged_idx]
-
-            updated_roots, updated_iterations, updated_converged_flag = back_up_solver.find_root(
-                func=func,
-                a=a,
-                b=b,
-                func_params=func_params,
-                tol=tol,
-                max_iter=max_iter
-            )
-
-        
-        results[unconverged_idx] = (updated_roots, updated_iterations, updated_converged_flag)
-        unconverged_mask = not(converged_flag)
-        unconverged_idx = np.where(unconverged_mask)[0]
-
-
-
 
 
 def _try_back_up_scalar(
@@ -315,6 +179,138 @@ def _try_back_up_scalar(
             warnings.warn("Unknown method type. Skipping to the next solver")
         
     return results
+
+
+def _try_back_up_vectorised(
+
+    func: Callable[[float], float],
+    results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]],
+    a: Optional[Union[npt.ArrayLike, float]],
+    b: Optional[Union[npt.ArrayLike, float]],
+    x0: Optional[Union[npt.ArrayLike, float]],
+    tol: float,
+    max_iter: int,
+    func_prime: Optional[Callable[[float], float]] = None,
+    func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
+    backup_solvers: List[Union[str, MethodType]] = [SolverName.BRENT, SolverName.BISECTION],       
+):
+    """
+    Docstring for __try_back_up_vectorised
+    
+    :param func: Description
+    :type func: Callable[[float], float]
+    :param results: Description
+    :type results: Union[Tuple[float, int, bool], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]]
+    :param a: Description
+    :type a: Optional[Union[npt.ArrayLike, float]]
+    :param b: Description
+    :type b: Optional[Union[npt.ArrayLike, float]]
+    :param x0: Description
+    :type x0: Optional[Union[npt.ArrayLike, float]]
+    :param tol: Description
+    :type tol: float
+    :param max_iter: Description
+    :type max_iter: int
+    :param func_prime: Description
+    :type func_prime: Optional[Callable[[float], float]]
+    :param func_params: Description
+    :type func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]]
+    :param backup_solvers: Description
+    :type backup_solvers: List[Union[str, MethodType]]
+    """
+    roots, iterations, converged_flag = results
+
+    if np.all(converged_flag):
+        return results
+
+    for backup_solver_name in backup_solvers:
+
+        unconverged_mask = np.logical_not(converged_flag)
+        unconverged_idx = np.where(unconverged_mask)[0]
+
+        if len(unconverged_idx) == 0:
+            break
+
+        try:
+            backup_solver_enum = parse_enum(backup_solver_name, SolverName)
+            backup_solver = SolverMap[backup_solver_enum]()
+            method_type = backup_solver.get_method_type()
+        
+        except Exception as e:
+            warnings.warn(f"Failed to initialise {backup_solver_enum.value}: {e}. Skipping to the next available solver.")
+            continue
+
+        try:
+            
+            if method_type == MethodType.HYBRID:
+               
+                if x0 is not None:
+                    
+                    try:
+                        success_flag = _try_back_up_open_vectorised(
+                            back_up_solver=backup_solver,  func=func, results=results,
+                            x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, tol=tol, max_iter=max_iter
+                        )
+
+                        if success_flag:
+                            continue
+                    
+                    except Exception as e:
+                        warnings.warn(f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}")
+                
+                if a is not None and b is not None:
+                    unconverged_mask = np.logical_not(converged_flag)
+                    unconverged_idx = np.where(unconverged_mask)[0]
+
+                    if len(unconverged_idx) > 0:
+                        
+                        try:
+                           success_flag = _try_back_up_bracket_vectorised(
+                                back_up_solver=backup_solver, func=func, results=results,
+                                a=a, b=b, unconverged_idx=unconverged_idx, func_params=func_params, tol=tol,
+                                max_iter=max_iter
+                            )
+                           
+                           if success_flag:
+                               continue
+                        
+                        except Exception as e:
+                            warnings.warn(f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}")
+                            continue
+
+            elif method_type == MethodType.BRACKET:
+                
+                if a is None or b is None:
+                    warnings.warn(f"Bracketing method {backup_solver_enum.value} requires brackets. Skipping to the next available solver.")
+                    continue
+
+                _try_back_up_bracket_vectorised(back_up_solver=backup_solver, func=func,
+                                                results=results, a=a, b=b, unconverged_idx=unconverged_idx,
+                                                func_params=func_params, tol=tol, max_iter=max_iter)
+
+            elif method_type == MethodType.OPEN:
+                
+                if x0 is None:
+                    warnings.warn(f"Bracketing method {backup_solver_enum.value} requires initial guess. Skipping to the next available solver.")
+                    continue
+
+                _try_back_up_open_vectorised(back_up_solver=backup_solver, func=func, results=results,
+                                             x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, func_prime=func_prime,
+                                             tol=tol, max_iter=max_iter)
+            
+        except Exception as e:
+            warnings.warn(f"{backup_solver_enum.value} failed: {e}")
+            continue
+
+    if not np.all(converged_flag):
+        n_failed = np.sum(np.logical_not(converged_flag))
+        warnings.warn(
+            f"Some roots did not converge. "
+            f"{n_failed} out of {len(converged_flag)} still unconverged"
+        )
+    
+    return results
+                     
 
 
 def _try_back_up_bracket_vectorised(
