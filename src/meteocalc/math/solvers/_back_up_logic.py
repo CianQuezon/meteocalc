@@ -5,15 +5,15 @@ Author: Cian Quezon
 """
 
 import warnings
+from typing import Callable, List, Optional, Tuple, Union
+
 import numpy as np
 import numpy.typing as npt
 
-from typing import Callable, Optional, Union, Tuple, List
-from meteorological_equations.math.solvers._solvers import Solver
-from meteorological_equations.shared._enum_tools import parse_enum
 from meteorological_equations.math.solvers._enums import MethodType, SolverName
+from meteorological_equations.math.solvers._solvers import Solver
 from meteorological_equations.math.solvers.core import SolverMap
-
+from meteorological_equations.shared._enum_tools import parse_enum
 
 
 def _use_back_up_solvers(
@@ -26,23 +26,23 @@ def _use_back_up_solvers(
     max_iter: int,
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = None
+    backup_solvers: List[Union[str, MethodType]] = None,
 ) -> Union[
     Tuple[float, int, bool],
     Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
 ]:
     """
     Apply backup solvers to unconverged root-finding results.
-    
+
     Dispatches to scalar or vectorized backup solver logic based on input
     dimensionality. Automatically tries a chain of fallback methods (default:
     Brent's method, then bisection) to improve convergence rates when the
     primary solver fails.
-    
+
     This function serves as the main entry point for the backup solver system,
     determining whether to use scalar or vectorized processing and delegating
     to the appropriate handler.
-    
+
     Parameters
     ----------
     func : Callable[[float], float]
@@ -83,19 +83,19 @@ def _use_back_up_solvers(
         Ordered list of backup solvers to try. Each solver is attempted in
         sequence until convergence or list exhaustion. Default is [BRENT, BISECTION].
         Available solvers: BRENT, BISECTION, NEWTON_RAPHSON, SECANT, REGULA_FALSI.
-    
+
     Returns
     -------
     results : tuple
         Updated results with the same structure as input:
         - Scalar: (root, iterations, converged) as (float, int, bool)
         - Vectorized: (roots, iterations, converged) as (ndarray, ndarray, ndarray)
-        
+
         For vectorized results:
         - roots: Array of root values (NaN for unconverged elements)
         - iterations: Array of iteration counts
         - converged: Boolean array indicating convergence status
-    
+
     Notes
     -----
     - The function automatically detects scalar vs. vectorized inputs based on
@@ -106,7 +106,7 @@ def _use_back_up_solvers(
       both x0 and (a, b) are provided
     - If all backup solvers fail, the function returns the input results unchanged
       with appropriate warnings
-    
+
     Examples
     --------
     Scalar usage with bracket methods:
@@ -114,10 +114,10 @@ def _use_back_up_solvers(
     >>> @njit
     >>> def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> # Primary solver failed
     >>> results = (np.nan, 100, False)
-    >>> 
+    >>>
     >>> # Try backup solvers with brackets
     >>> root, iters, converged = _use_back_up_solvers(
     ...     func=f,
@@ -130,18 +130,18 @@ def _use_back_up_solvers(
     ... )
     >>> print(f"Root: {root:.6f}, Converged: {converged}")
     Root: 2.000000, Converged: True
-    
+
     Vectorized usage with mixed convergence:
-    
+
     >>> @njit
     >>> def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> # Some elements converged, some didn't
     >>> roots = np.array([2.0, np.nan, np.nan])
     >>> iters = np.array([8, 100, 100])
     >>> conv = np.array([True, False, False])
-    >>> 
+    >>>
     >>> # Apply backup solvers to unconverged elements only
     >>> roots, iters, conv = _use_back_up_solvers(
     ...     func=f,
@@ -154,11 +154,11 @@ def _use_back_up_solvers(
     ... )
     >>> print(conv)
     [True True True]
-    
+
     Using custom backup solver chain:
-    
+
     >>> from meteorological_equations.math.solvers import SolverName
-    >>> 
+    >>>
     >>> # Try Newton first, then Brent, then bisection
     >>> results = _use_back_up_solvers(
     ...     func=f,
@@ -175,12 +175,12 @@ def _use_back_up_solvers(
     ...         SolverName.BISECTION
     ...     ]
     ... )
-    
+
     See Also
     --------
     _try_back_up_scalar : Scalar backup solver implementation
     _try_back_up_vectorised : Vectorized backup solver implementation
-    """  
+    """
 
     if backup_solvers is None:
         backup_solvers = [SolverName.BRENT, SolverName.BISECTION]
@@ -191,12 +191,10 @@ def _use_back_up_solvers(
 
     if roots.ndim == 0:
         scalar_results = (float(roots), int(iterations), bool(converged_flag))
-            
+
         scalar_a = float(a) if a is not None else None
         scalar_b = float(b) if b is not None else None
         scalar_x0 = float(x0) if x0 is not None else None
-
-
 
         return _try_back_up_scalar(
             func=func,
@@ -208,12 +206,10 @@ def _use_back_up_solvers(
             max_iter=max_iter,
             func_prime=func_prime,
             func_params=func_params,
-            backup_solvers=backup_solvers
-
+            backup_solvers=backup_solvers,
         )
-        
+
     else:
-        
         return _try_back_up_vectorised(
             func=func,
             results=results,
@@ -224,10 +220,8 @@ def _use_back_up_solvers(
             max_iter=max_iter,
             func_prime=func_prime,
             func_params=func_params,
-            backup_solvers=backup_solvers
+            backup_solvers=backup_solvers,
         )
-
-
 
 
 def _try_back_up_scalar(
@@ -241,19 +235,18 @@ def _try_back_up_scalar(
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
     backup_solvers: List[Union[str, MethodType]] = None,
-            
-    ):
+):
     """
     Apply a chain of backup solvers to a single unconverged root-finding result.
-    
+
     Iterates through a sequence of backup solvers, attempting each in order until
     one successfully converges or all are exhausted. Handles different solver types
     (open, bracket, hybrid) and gracefully skips solvers when required inputs are
     missing.
-    
+
     This function is designed for scalar (single-value) operations. For vectorized
     operations on arrays, use `_try_back_up_vectorised` instead.
-    
+
     Parameters
     ----------
     func : Callable[[float], float]
@@ -291,16 +284,16 @@ def _try_back_up_scalar(
         func is called as func(x, a, b). Default is None.
     backup_solvers : list of str or SolverName, optional
         Ordered sequence of backup solvers to try. Each solver is attempted in the
-        order specified until one converges. Default is [SolverName.BRENT, 
+        order specified until one converges. Default is [SolverName.BRENT,
         SolverName.BISECTION].
-        
+
         Available solvers:
         - BRENT: Hybrid method combining bisection, secant, and inverse quadratic
         - BISECTION: Reliable bracket method, always converges but slower
         - NEWTON_RAPHSON: Fast open method requiring derivative
         - SECANT: Open method approximating derivative
         - REGULA_FALSI: Bracket method, alternative to bisection
-    
+
     Returns
     -------
     results : tuple of (float, int, bool)
@@ -308,7 +301,7 @@ def _try_back_up_scalar(
         - results[0]: Root value (solution to func(x) = 0, or NaN if all failed)
         - results[1]: Total iterations used (cumulative across attempts)
         - results[2]: Convergence status (True if any solver succeeded, False otherwise)
-    
+
     Notes
     -----
     Solver Selection Logic:
@@ -316,20 +309,20 @@ def _try_back_up_scalar(
       bracket interface if (a, b) provided
     - BRACKET solvers: Require both a and b; skipped if either is None
     - OPEN solvers: Require x0; skipped if None
-    
+
     Error Handling:
     - If a solver raises an exception, a warning is issued and the next solver is tried
     - If a solver converges (results[2] == True), iteration stops and results are returned
     - If all solvers fail or are skipped, the original results are returned unchanged
-    
+
     The function returns immediately upon first successful convergence. This means
     earlier solvers in the chain are preferred, so order matters.
-    
+
     Performance Considerations:
     - Brent's method is usually fastest for well-behaved functions
     - Bisection is slowest but most reliable
     - Newton-Raphson is very fast when close to the root with good derivative
-    
+
     Examples
     --------
     Basic usage with bracket methods:
@@ -337,10 +330,10 @@ def _try_back_up_scalar(
     >>> @njit
     >>> def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> # Primary solver failed
     >>> results = (np.nan, 100, False)
-    >>> 
+    >>>
     >>> # Try backup solvers
     >>> root, iters, converged = _try_back_up_scalar(
     ...     func=f,
@@ -351,26 +344,26 @@ def _try_back_up_scalar(
     ...     tol=1e-6,
     ...     max_iter=100
     ... )
-    >>> 
+    >>>
     >>> print(f"Root: {root:.6f}")
     Root: 2.000000
     >>> print(f"Converged: {converged}")
     Converged: True
     >>> print(f"Iterations: {iters}")
     Iterations: 8
-    
+
     Using Newton-Raphson with derivative:
     >>>
     >>> @njit
     >>> def f(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> @njit
     >>> def f_prime(x):
     ...     return 2 * x
-    >>> 
+    >>>
     >>> results = (np.nan, 50, False)
-    >>> 
+    >>>
     >>> root, iters, converged = _try_back_up_scalar(
     ...     func=f,
     ...     results=results,
@@ -382,21 +375,21 @@ def _try_back_up_scalar(
     ...     func_prime=f_prime,
     ...     backup_solvers=[SolverName.NEWTON_RAPHSON, SolverName.BRENT]
     ... )
-    >>> 
+    >>>
     >>> print(f"Root: {root:.10f}")
     Root: 2.0000000000
-    
+
     Custom solver chain:
-    
+
     >>> from meteorological_equations.math.solvers import SolverName
-    >>> 
+    >>>
     >>> # Try Newton first, then secant, finally bisection as last resort
     >>> custom_chain = [
     ...     SolverName.NEWTON_RAPHSON,
     ...     SolverName.SECANT,
     ...     SolverName.BISECTION
     ... ]
-    >>> 
+    >>>
     >>> results = _try_back_up_scalar(
     ...     func=f,
     ...     results=(np.nan, 100, False),
@@ -408,17 +401,17 @@ def _try_back_up_scalar(
     ...     func_prime=f_prime,
     ...     backup_solvers=custom_chain
     ... )
-    
+
     With function parameters:
     >>>
     >>> @njit
     >>> def parametric_func(x, a, b):
     ...     return a * x**2 + b
     >>>
-    >>> @njit 
+    >>> @njit
     >>> def parametric_prime(x, a, b):
     ...     return 2 * a * x
-    >>> 
+    >>>
     >>> # Solve a*x^2 + b = 0 with a=1, b=-4
     >>> root, iters, converged = _try_back_up_scalar(
     ...     func=parametric_func,
@@ -433,27 +426,27 @@ def _try_back_up_scalar(
     ... )
     >>> print(f"Root: {root:.6f}")
     Root: 2.000000
-    
+
     Handling already-converged results:
-    
+
     >>> # Primary solver succeeded
     >>> results = (2.0, 5, True)
-    >>> 
+    >>>
     >>> # Function returns immediately without trying backups
     >>> root, iters, converged = _try_back_up_scalar(
     ...     func=f, results=results, a=0.0, b=5.0, x0=None,
     ...     tol=1e-6, max_iter=100
     ... )
-    >>> 
+    >>>
     >>> print(f"Root: {root}, Iterations: {iters}")
     Root: 2.0, Iterations: 5
     >>> # Original results returned unchanged
-    
+
     See Also
     --------
     _try_back_up_vectorised : Vectorized version for arrays of values
     _use_back_up_solvers : Main dispatcher function
-    
+
     Warnings
     --------
     - If no solvers can be applied (e.g., x0, a, and b are all None), the function
@@ -471,90 +464,107 @@ def _try_back_up_scalar(
         return results
 
     for backup_solver_name in backup_solvers:
-            
         back_up_solver_enum = parse_enum(backup_solver_name, SolverName)
         back_up_solver = SolverMap[back_up_solver_enum]()
 
         method_type = back_up_solver.get_method_type()
-            
+
         if method_type == MethodType.HYBRID:
             converged_flag = False
-                
+
             if x0 is not None:
-                    
                 try:
-                    results = back_up_solver.find_root(func=func, func_prime=func_prime, x0=x0, func_params=func_params,
-                                                    tol=tol, max_iter=max_iter)
+                    results = back_up_solver.find_root(
+                        func=func,
+                        func_prime=func_prime,
+                        x0=x0,
+                        func_params=func_params,
+                        tol=tol,
+                        max_iter=max_iter,
+                    )
                     converged_flag = results[2]
-                        
+
                     if converged_flag:
                         return results
-                        
+
                 except Exception as e:
-                    warnings.warn(f"Open method failed: {e}")
+                    warnings.warn(f"Open method failed: {e}", stacklevel=2)
 
             if a is not None and b is not None:
-                    
                 try:
-                    results = back_up_solver.find_root(func=func, a=a, b=b, func_params=func_params,
-                                                        tol=tol, max_iter=max_iter)
+                    results = back_up_solver.find_root(
+                        func=func, a=a, b=b, func_params=func_params, tol=tol, max_iter=max_iter
+                    )
                     converged_flag = results[2]
                     if converged_flag:
                         return results
-                        
+
                 except Exception as e:
-                    warnings.warn(f"Bracketing method failed: {e}")
+                    warnings.warn(f"Bracketing method failed: {e}", stacklevel=2)
 
-                
             if not converged_flag:
-                warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                warnings.warn(
+                    f"{back_up_solver_enum.value} did not converge. Skipping to the next solver",
+                    stacklevel=2,
+                )
                 continue
-
 
         elif method_type == MethodType.BRACKET:
-
             try:
-                results = back_up_solver.find_root(func=func, a=a, b=b, func_params=func_params,
-                                                        tol=tol, max_iter=max_iter)
-                    
+                results = back_up_solver.find_root(
+                    func=func, a=a, b=b, func_params=func_params, tol=tol, max_iter=max_iter
+                )
+
                 converged_flag = results[2]
 
                 if not converged_flag:
-                    warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                    warnings.warn(
+                        f"{back_up_solver_enum.value} did not converge. Skipping to the next solver",
+                        stacklevel=2,
+                    )
                     continue
 
                 return results
 
             except Exception as e:
-                     
-                warnings.warn(f"Bracketing method failed: {e}. Skipping to the next solver.")
+                warnings.warn(
+                    f"Bracketing method failed: {e}. Skipping to the next solver.", stacklevel=2
+                )
                 continue
-            
+
         elif method_type == MethodType.OPEN:
-                
             try:
-                results = back_up_solver.find_root(func=func, func_prime=func_prime, x0=x0, func_params=func_params,
-                                                        tol=tol, max_iter=max_iter)
+                results = back_up_solver.find_root(
+                    func=func,
+                    func_prime=func_prime,
+                    x0=x0,
+                    func_params=func_params,
+                    tol=tol,
+                    max_iter=max_iter,
+                )
                 converged_flag = results[2]
 
                 if not converged_flag:
-                    warnings.warn(f"{back_up_solver_enum.value} did not converge. Skipping to the next solver")
+                    warnings.warn(
+                        f"{back_up_solver_enum.value} did not converge. Skipping to the next solver",
+                        stacklevel=2,
+                    )
                     continue
                 return results
-                
+
             except Exception as e:
-                     
-                warnings.warn(f"Open method failed: {e}. Skipping to the next solver.")
+                warnings.warn(
+                    f"Open method failed: {e}. Skipping to the next solver.", stacklevel=2
+                )
                 continue
-            
+
         else:
-            warnings.warn("Unknown method type. Skipping to the next solver")
-        
+            warnings.warn("Unknown method type. Skipping to the next solver", stacklevel=2)
+
     return results
 
 
 def _try_back_up_vectorised(
-
     func: Callable[[float], float],
     results: Tuple[npt.NDArray, npt.NDArray, npt.NDArray],
     a: Optional[npt.ArrayLike],
@@ -564,23 +574,23 @@ def _try_back_up_vectorised(
     max_iter: int,
     func_prime: Optional[Callable[[float], float]] = None,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
-    backup_solvers: List[Union[str, MethodType]] = None,       
+    backup_solvers: List[Union[str, MethodType]] = None,
 ):
     """
     Apply a chain of backup solvers to vectorized unconverged root-finding results.
-    
+
     Iterates through a sequence of backup solvers, applying each to only the
     unconverged elements until all converge or all solvers are exhausted. This
     function efficiently handles arrays of values by operating on batches of
     unconverged elements rather than looping over individual values.
-    
+
     The function modifies the results arrays in-place, updating only the elements
     that successfully converge with each solver attempt. Already-converged elements
     are preserved throughout the process.
-    
+
     This is the vectorized counterpart to `_try_back_up_scalar` and is designed for
     efficient batch processing of multiple root-finding problems simultaneously.
-    
+
     Parameters
     ----------
     func : Callable[[float], float]
@@ -592,7 +602,7 @@ def _try_back_up_vectorised(
         - results[0]: Root values (float64 array, NaN for unconverged elements)
         - results[1]: Iteration counts (int64 array)
         - results[2]: Convergence flags (bool array, False for unconverged)
-        
+
         These arrays are modified in-place as solvers succeed.
     a : array_like, optional
         Lower bracket bounds, one per element. Required for bracket-based methods
@@ -627,14 +637,14 @@ def _try_back_up_vectorised(
         Ordered sequence of backup solvers to try. Each solver is attempted on
         unconverged elements until all converge or the list is exhausted.
         Default is [SolverName.BRENT, SolverName.BISECTION].
-        
+
         Available solvers:
         - BRENT: Hybrid method, very robust and efficient
         - BISECTION: Reliable bracket method, guaranteed convergence
         - NEWTON_RAPHSON: Fast derivative-based method
         - SECANT: Derivative-free approximation to Newton
         - REGULA_FALSI: Alternative bracket method
-    
+
     Returns
     -------
     results : tuple of (ndarray, ndarray, ndarray)
@@ -642,7 +652,7 @@ def _try_back_up_vectorised(
         - roots: Float64 array of root values (NaN for any remaining unconverged)
         - iterations: Int64 array of total iteration counts (cumulative)
         - converged: Boolean array indicating final convergence status
-    
+
     Notes
     -----
     Algorithm Overview:
@@ -654,45 +664,45 @@ def _try_back_up_vectorised(
        d. Update results in-place for newly converged elements
        e. Continue to next solver if any remain unconverged
     3. Warn if any elements still unconverged after all attempts
-    
+
     Solver Selection:
     - HYBRID solvers: Try open interface (if x0 provided) then bracket (if a, b provided)
     - BRACKET solvers: Require both a and b arrays; skipped if either is None
     - OPEN solvers: Require x0 array; skipped if None
-    
+
     Efficiency Characteristics:
     - Only unconverged elements are passed to each solver (reduces computation)
     - Arrays modified in-place (minimizes memory allocation)
     - Single solver call per attempt (vectorized, not looped)
     - Index mapping ensures correct updates to original arrays
-    
+
     Edge Cases Handled:
     - All elements converged: Early return, no solver calls
     - No unconverged elements mid-chain: Break early
     - Missing inputs (a, b, x0): Skip incompatible solvers with warnings
     - Solver exceptions: Catch, warn, continue to next solver
     - Partial convergence: Only update successful elements
-    
+
     Examples
     --------
     Basic vectorized usage with all unconverged:
-    
+
     >>> import numpy as np
-    >>> 
+    >>>
     >>> @njit
     >>> def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> # 5 unconverged elements
     >>> roots = np.full(5, np.nan)
     >>> iters = np.full(5, 100)
     >>> conv = np.full(5, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Bracket bounds for each element
     >>> a = np.array([0.0, 0.5, 1.0, 1.5, 1.8])
     >>> b = np.array([3.0, 3.0, 3.0, 3.0, 2.5])
-    >>> 
+    >>>
     >>> # Apply backup solvers
     >>> roots, iters, conv = _try_back_up_vectorised(
     ...     func=f,
@@ -703,58 +713,58 @@ def _try_back_up_vectorised(
     ...     tol=1e-6,
     ...     max_iter=100
     ... )
-    >>> 
+    >>>
     >>> print(f"All converged: {np.all(conv)}")
     All converged: True
     >>> print(f"Roots (all near 2.0): {roots}")
     Roots (all near 2.0): [2. 2. 2. 2. 2.]
-    
+
     Partial convergence - preserving already-converged elements:
-    
+
     >>> # Some elements already converged
     >>> roots = np.array([2.0, np.nan, 1.5, np.nan, np.nan])
     >>> iters = np.array([8, 100, 10, 100, 100])
     >>> conv = np.array([True, False, True, False, False])
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> a = np.array([0, 0, 0, 1, 1.5])
     >>> b = np.array([3, 3, 3, 3, 3])
-    >>> 
+    >>>
     >>> # Only unconverged elements (indices 1, 3, 4) are processed
     >>> roots, iters, conv = _try_back_up_vectorised(
     ...     func=f, results=results, a=a, b=b, x0=None,
     ...     tol=1e-6, max_iter=100
     ... )
-    >>> 
+    >>>
     >>> print(f"Original converged preserved: {roots[0]:.1f}, {roots[2]:.1f}")
     Original converged preserved: 2.0, 1.5
     >>> print(f"Previously unconverged now solved: {conv}")
     Previously unconverged now solved: [True True True True True]
-    
+
     Using custom solver chain with both open and bracket methods:
-    
+
     >>> def f(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> def f_prime(x):
     ...     return 2 * x
-    >>> 
+    >>>
     >>> roots = np.full(3, np.nan)
     >>> iters = np.full(3, 100)
     >>> conv = np.full(3, False)
-    >>> 
+    >>>
     >>> # Provide both x0 and brackets for maximum flexibility
     >>> x0 = np.array([1.0, 1.5, 2.5])
     >>> a = np.array([0.0, 0.0, 0.0])
     >>> b = np.array([5.0, 5.0, 5.0])
-    >>> 
+    >>>
     >>> # Try Newton first (fast), then Brent (robust), then bisection (reliable)
     >>> custom_chain = [
     ...     SolverName.NEWTON_RAPHSON,
     ...     SolverName.BRENT,
     ...     SolverName.BISECTION
     ... ]
-    >>> 
+    >>>
     >>> roots, iters, conv = _try_back_up_vectorised(
     ...     func=f,
     ...     results=(roots, iters, conv),
@@ -764,17 +774,17 @@ def _try_back_up_vectorised(
     ...     func_prime=f_prime,
     ...     backup_solvers=custom_chain
     ... )
-    >>> 
+    >>>
     >>> print(f"All converged: {np.all(conv)}")
     All converged: True
     >>> print(f"Roots: {roots}")
     Roots: [2. 2. 2.]
-    
+
     With function parameters (different parameters per element):
-    
+
     >>> def parametric_func(x, a, b):
     ...     return a * x**3 + b
-    >>> 
+    >>>
     >>> # Solve a[i]*x^3 + b[i] = 0 for each i
     >>> # Different (a, b) parameters for each of 3 elements
     >>> func_params = np.array([
@@ -782,14 +792,14 @@ def _try_back_up_vectorised(
     ...     [2.0, -16.0],  # Solves 2x^3 - 16 = 0, root at 2
     ...     [0.5, -4.0],   # Solves 0.5x^3 - 4 = 0, root at 2
     ... ])
-    >>> 
+    >>>
     >>> roots = np.full(3, np.nan)
     >>> iters = np.full(3, 100)
     >>> conv = np.full(3, False)
-    >>> 
+    >>>
     >>> bracket_a = np.array([0, 0, 0])
     >>> bracket_b = np.array([5, 5, 5])
-    >>> 
+    >>>
     >>> roots, iters, conv = _try_back_up_vectorised(
     ...     func=parametric_func,
     ...     results=(roots, iters, conv),
@@ -797,22 +807,22 @@ def _try_back_up_vectorised(
     ...     tol=1e-6, max_iter=100,
     ...     func_params=func_params
     ... )
-    >>> 
+    >>>
     >>> print(f"All roots near 2.0: {np.allclose(roots, 2.0)}")
     All roots near 2.0: True
-    
+
     Large-scale example (1000 elements):
-    
+
     >>> n = 1000
     >>> roots = np.full(n, np.nan)
     >>> iters = np.full(n, 100)
     >>> conv = np.full(n, False)
-    >>> 
+    >>>
     >>> # Random brackets around x=2
     >>> np.random.seed(42)
     >>> a = np.random.uniform(0.0, 1.9, n)
     >>> b = np.random.uniform(2.1, 4.0, n)
-    >>> 
+    >>>
     >>> import time
     >>> start = time.time()
     >>> roots, iters, conv = _try_back_up_vectorised(
@@ -820,19 +830,19 @@ def _try_back_up_vectorised(
     ...     a=a, b=b, x0=None, tol=1e-6, max_iter=100
     ... )
     >>> elapsed = time.time() - start
-    >>> 
+    >>>
     >>> print(f"Solved {n} roots in {elapsed:.3f}s")
     Solved 1000 roots in 0.127s
     >>> print(f"Convergence rate: {100*np.sum(conv)/n:.1f}%")
     Convergence rate: 100.0%
-    
+
     See Also
     --------
     _try_back_up_scalar : Scalar version for single values
     _try_back_up_bracket_vectorised : Helper for bracket methods
     _try_back_up_open_vectorised : Helper for open methods
     _use_back_up_solvers : Main dispatcher function
-    
+
     Warnings
     --------
     - All input arrays (a, b, x0, func_params) must have compatible shapes with
@@ -852,7 +862,6 @@ def _try_back_up_vectorised(
         return results
 
     for backup_solver_name in backup_solvers:
-
         unconverged_mask = np.logical_not(converged_flag)
         unconverged_idx = np.where(unconverged_mask)[0]
 
@@ -863,83 +872,120 @@ def _try_back_up_vectorised(
             backup_solver_enum = parse_enum(backup_solver_name, SolverName)
             backup_solver = SolverMap[backup_solver_enum]()
             method_type = backup_solver.get_method_type()
-        
+
         except Exception as e:
-            warnings.warn(f"Failed to initialise {backup_solver_enum.value}: {e}. Skipping to the next available solver.")
+            warnings.warn(
+                f"Failed to initialise {backup_solver_enum.value}: {e}. Skipping to the next available solver.",
+                stacklevel=2,
+            )
             continue
 
         try:
-            
             if method_type == MethodType.HYBRID:
-               
                 if x0 is not None:
-                    
                     try:
                         success_flag = _try_back_up_open_vectorised(
-                            backup_solver=backup_solver,  func=func, results=results,
-                            x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, 
-                            func_prime=func_prime, tol=tol, max_iter=max_iter
+                            backup_solver=backup_solver,
+                            func=func,
+                            results=results,
+                            x0=x0,
+                            unconverged_idx=unconverged_idx,
+                            func_params=func_params,
+                            func_prime=func_prime,
+                            tol=tol,
+                            max_iter=max_iter,
                         )
 
                         if success_flag:
                             continue
-                    
+
                     except Exception as e:
-                        warnings.warn(f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}")
-                
+                        warnings.warn(
+                            f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}",
+                            stacklevel=2,
+                        )
+
                 if a is not None and b is not None:
                     unconverged_mask = np.logical_not(converged_flag)
                     unconverged_idx = np.where(unconverged_mask)[0]
 
                     if len(unconverged_idx) > 0:
-                        
                         try:
-                           success_flag = _try_back_up_bracket_vectorised(
-                                backup_solver=backup_solver, func=func, results=results,
-                                a=a, b=b, unconverged_idx=unconverged_idx, func_params=func_params, tol=tol,
-                                max_iter=max_iter
+                            success_flag = _try_back_up_bracket_vectorised(
+                                backup_solver=backup_solver,
+                                func=func,
+                                results=results,
+                                a=a,
+                                b=b,
+                                unconverged_idx=unconverged_idx,
+                                func_params=func_params,
+                                tol=tol,
+                                max_iter=max_iter,
                             )
-                           
-                           if success_flag:
-                               continue
-                        
+
+                            if success_flag:
+                                continue
+
                         except Exception as e:
-                            warnings.warn(f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}")
+                            warnings.warn(
+                                f"Open interface for hybrid solver {backup_solver_enum.value} failed: {e}",
+                                stacklevel=2,
+                            )
                             continue
 
             elif method_type == MethodType.BRACKET:
-                
                 if a is None or b is None:
-                    warnings.warn(f"Bracketing method {backup_solver_enum.value} requires brackets. Skipping to the next available solver.")
+                    warnings.warn(
+                        f"Bracketing method {backup_solver_enum.value} requires brackets. Skipping to the next available solver.",
+                        stacklevel=2,
+                    )
                     continue
 
-                _try_back_up_bracket_vectorised(backup_solver=backup_solver, func=func,
-                                                results=results, a=a, b=b, unconverged_idx=unconverged_idx,
-                                                func_params=func_params, tol=tol, max_iter=max_iter)
+                _try_back_up_bracket_vectorised(
+                    backup_solver=backup_solver,
+                    func=func,
+                    results=results,
+                    a=a,
+                    b=b,
+                    unconverged_idx=unconverged_idx,
+                    func_params=func_params,
+                    tol=tol,
+                    max_iter=max_iter,
+                )
 
             elif method_type == MethodType.OPEN:
-                
                 if x0 is None:
-                    warnings.warn(f"Bracketing method {backup_solver_enum.value} requires initial guess. Skipping to the next available solver.")
+                    warnings.warn(
+                        f"Bracketing method {backup_solver_enum.value} requires initial guess. Skipping to the next available solver.",
+                        stacklevel=2,
+                    )
                     continue
 
-                _try_back_up_open_vectorised(backup_solver=backup_solver, func=func, results=results,
-                                             x0=x0, unconverged_idx=unconverged_idx, func_params=func_params, func_prime=func_prime,
-                                             tol=tol, max_iter=max_iter)
-            
+                _try_back_up_open_vectorised(
+                    backup_solver=backup_solver,
+                    func=func,
+                    results=results,
+                    x0=x0,
+                    unconverged_idx=unconverged_idx,
+                    func_params=func_params,
+                    func_prime=func_prime,
+                    tol=tol,
+                    max_iter=max_iter,
+                )
+
         except Exception as e:
-            warnings.warn(f"{backup_solver_enum.value} failed: {e}")
+            warnings.warn(f"{backup_solver_enum.value} failed: {e}", stacklevel=2)
             continue
 
     if not np.all(converged_flag):
         n_failed = np.sum(np.logical_not(converged_flag))
         warnings.warn(
             f"Some roots did not converge. "
-            f"{n_failed} out of {len(converged_flag)} still unconverged"
+            f"{n_failed} out of {len(converged_flag)} still unconverged",
+            stacklevel=2,
         )
-    
+
     return results
-                     
 
 
 def _try_back_up_bracket_vectorised(
@@ -952,27 +998,26 @@ def _try_back_up_bracket_vectorised(
     tol: float,
     max_iter: int,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]],
-        
 ) -> bool:
     """
     Apply a bracket-based solver to unconverged elements in vectorized results.
-    
+
     Extracts unconverged elements from the full arrays, applies the specified
     bracket-based root-finding solver (e.g., Brent, bisection, regula falsi) to
     those elements only, and updates the original results in-place for elements
     that converge.
-    
+
     This function serves as a helper for `_try_back_up_vectorised`, handling the
     index manipulation and partial array updates required for efficient vectorized
     backup solver application with bracket methods.
-    
+
     Parameters
     ----------
     backup_solver : Solver
         An initialized solver instance implementing a bracket-based method (BRACKET
         or HYBRID type). Must have a `find_root` method that accepts bracket bounds
         (a, b) and returns (roots, iterations, converged) tuple.
-        
+
         Compatible solvers: Brent, Bisection, Regula Falsi, or any hybrid solver
         used in bracket mode.
     func : Callable[[float], float]
@@ -984,7 +1029,7 @@ def _try_back_up_bracket_vectorised(
         - results[0]: Root values (float64), NaN for unconverged
         - results[1]: Iteration counts (int64)
         - results[2]: Convergence flags (bool)
-        
+
         Only elements at `unconverged_idx` positions may be modified.
     a : array_like
         Lower bracket bounds for all elements (full array). Must have the same
@@ -999,7 +1044,7 @@ def _try_back_up_bracket_vectorised(
         Integer indices of unconverged elements in the results arrays. Typically
         obtained via `np.where(~converged_flag)[0]`. Only these elements are
         passed to the solver.
-        
+
         Example: If converged = [True, False, True, False], then
         unconverged_idx = [1, 3]
     tol : float
@@ -1013,20 +1058,20 @@ def _try_back_up_bracket_vectorised(
         - None: No additional parameters
         - 1D array: Same parameters for all elements
         - 2D array: func_params[i] contains parameters for element i
-        
+
         Only rows corresponding to unconverged_idx are extracted and passed to
         the solver. Default is None.
-    
+
     Returns
     -------
     success : bool
         True if at least one previously unconverged element converged with this
         solver, False if all unconverged elements remained unconverged or if an
         exception occurred.
-        
+
         This return value helps the calling function decide whether to continue
         to the next solver in the chain.
-    
+
     Notes
     -----
     Algorithm Steps:
@@ -1036,61 +1081,61 @@ def _try_back_up_bracket_vectorised(
     4. Map back to original indices: unconverged_idx[newly_converged_mask]
     5. Update original arrays in-place at those positions only
     6. Return True if any converged, False otherwise
-    
+
     Index Mapping:
     The function performs a two-level index mapping:
     - Level 1: unconverged_idx maps from subset → full array
     - Level 2: updated_converged_flag identifies successes within subset
     - Combined: unconverged_idx[updated_converged_flag] gives final positions
-    
+
     Example index mapping:
         Full array size: 5
         converged_flag = [True, False, True, False, False]
         unconverged_idx = [1, 3, 4]  # Positions of False values
-        
+
         After solver:
         updated_converged_flag = [True, False, True]  # For indices [1,3,4]
-        
+
         Newly converged positions in full array:
         unconverged_idx[[True, False, True]] = [1, 4]
-    
+
     In-Place Modification:
     The results tuple arrays are modified in-place. The function does not create
     new arrays but updates existing ones. This is memory-efficient but means the
     caller's arrays are changed.
-    
+
     Error Handling:
     - Any exception during solver execution is caught
     - A warning is issued with the error message
     - Function returns False to indicate no convergence
     - Original results remain unchanged on exception
-    
+
     Examples
     --------
     Basic usage within backup solver chain:
-    
+
     >>> import numpy as np
     >>> from meteorological_equations.math.solvers import BrentSolver
-    >>> 
+    >>>
     >>> @njit
     >>> def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> # Setup: 5 elements, 3 unconverged
     >>> roots = np.array([2.0, np.nan, 1.5, np.nan, np.nan])
     >>> iters = np.array([8, 100, 10, 100, 100])
     >>> conv = np.array([True, False, True, False, False])
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Identify unconverged
     >>> unconverged_idx = np.where(~conv)[0]
     >>> print(f"Unconverged indices: {unconverged_idx}")
     Unconverged indices: [1 3 4]
-    >>> 
+    >>>
     >>> # Bracket bounds (full arrays)
     >>> a = np.array([0, 0, 0, 1, 1.5])
     >>> b = np.array([3, 3, 3, 3, 3])
-    >>> 
+    >>>
     >>> # Apply Brent solver to unconverged elements
     >>> solver = BrentSolver()
     >>> success = _try_back_up_bracket_vectorised(
@@ -1103,25 +1148,25 @@ def _try_back_up_bracket_vectorised(
     ...     tol=1e-6,
     ...     max_iter=100
     ... )
-    >>> 
+    >>>
     >>> print(f"At least one converged: {success}")
     At least one converged: True
     >>> print(f"Updated convergence: {conv}")
     Updated convergence: [True True True True True]
     >>> print(f"All roots near 2.0: {np.allclose(roots[~np.isnan(roots)], 2.0)}")
     All roots near 2.0: True
-    
+
     Demonstrating index mapping:
-    
+
     >>> # Start with 4 elements, 2 unconverged at positions 1 and 3
     >>> roots = np.array([1.0, np.nan, 2.0, np.nan])
     >>> iters = np.array([5, 100, 8, 100])
     >>> conv = np.array([True, False, True, False])
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([1, 3])
     >>> print(f"Will try to solve elements at positions: {unconverged_idx}")
     Will try to solve elements at positions: [1 3]
-    >>> 
+    >>>
     >>> # After solver runs on unconverged subset
     >>> # Suppose element at position 1 converges, but position 3 doesn't
     >>> # This happens internally in the function:
@@ -1129,73 +1174,73 @@ def _try_back_up_bracket_vectorised(
     >>> # newly_converged_original_idx = unconverged_idx[[True, False]] = [1]
     >>> # results[0][1] gets updated
     >>> # results[2][1] becomes True
-    
+
     Partial convergence case:
-    
+
     >>> # 3 unconverged elements
     >>> roots = np.full(3, np.nan)
     >>> iters = np.full(3, 100)
     >>> conv = np.full(3, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # One bracket pair is invalid (same sign), others valid
     >>> a = np.array([0.0, 3.0, 0.0])  # func(3.0) > 0
     >>> b = np.array([3.0, 5.0, 3.0])  # func(5.0) > 0, same sign!
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([0, 1, 2])
-    >>> 
+    >>>
     >>> solver = BrentSolver()
     >>> success = _try_back_up_bracket_vectorised(
     ...     solver, f, results, a, b, unconverged_idx, 1e-6, 100
     ... )
-    >>> 
+    >>>
     >>> # Elements 0 and 2 converge, element 1 fails (invalid bracket)
     >>> print(f"Partial success: {success}")  # True (at least one succeeded)
     Partial success: True
     >>> print(f"Convergence flags: {conv}")
     Convergence flags: [True False True]
-    
+
     With function parameters:
-    
+
     >>> def parametric_func(x, a, b):
     ...     return a * x**3 + b
-    >>> 
+    >>>
     >>> roots = np.full(2, np.nan)
     >>> iters = np.full(2, 100)
     >>> conv = np.full(2, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Different parameters for each element
     >>> func_params = np.array([
     ...     [1.0, -8.0],   # x^3 - 8 = 0
     ...     [2.0, -16.0],  # 2x^3 - 16 = 0
     ... ])
-    >>> 
+    >>>
     >>> bracket_a = np.array([0, 0])
     >>> bracket_b = np.array([5, 5])
     >>> unconverged_idx = np.array([0, 1])
-    >>> 
+    >>>
     >>> success = _try_back_up_bracket_vectorised(
     ...     solver, parametric_func, results,
     ...     bracket_a, bracket_b, unconverged_idx,
     ...     1e-6, 100, func_params
     ... )
-    >>> 
+    >>>
     >>> print(f"Both converged: {np.all(conv)}")
     Both converged: True
     >>> print(f"Roots: {roots}")
     Roots: [2. 2.]
-    
+
     Error handling:
-    
+
     >>> # Invalid brackets (both same sign)
     >>> bad_a = np.array([3.0, 4.0])
     >>> bad_b = np.array([5.0, 6.0])
-    >>> 
+    >>>
     >>> roots = np.full(2, np.nan)
     >>> iters = np.full(2, 100)
     >>> conv = np.full(2, False)
-    >>> 
+    >>>
     >>> # This will fail and issue warning
     >>> success = _try_back_up_bracket_vectorised(
     ...     solver, f, (roots, iters, conv),
@@ -1203,22 +1248,22 @@ def _try_back_up_bracket_vectorised(
     ...     1e-6, 100
     ... )
     >>> # Warning: Bracketing method failed: ...
-    >>> 
+    >>>
     >>> print(f"Failed gracefully: {not success}")
     Failed gracefully: True
     >>> print(f"Original results preserved: {np.all(~conv)}")
     Original results preserved: True
-    
+
     See Also
     --------
     _try_back_up_open_vectorised : Equivalent for open methods (Newton, secant)
     _try_back_up_vectorised : Main vectorized backup orchestrator
     _update_converged_results : Helper for in-place array updates
     _get_unconverged_func_params : Helper for extracting parameter subsets
-    
+
     """
 
-    try: 
+    try:
         original_roots = results[0]
         original_iterations = results[1]
         original_converged_flag = results[2]
@@ -1239,7 +1284,7 @@ def _try_back_up_bracket_vectorised(
             b=b_unconverged,
             func_params=func_params_unconverged,
             tol=tol,
-            max_iter=max_iter
+            max_iter=max_iter,
         )
 
         _update_converged_results(
@@ -1249,13 +1294,13 @@ def _try_back_up_bracket_vectorised(
             unconverged_idx=unconverged_idx,
             updated_roots=updated_roots,
             updated_iterations=updated_iterations,
-            updated_converged_flag=updated_converged_flag
+            updated_converged_flag=updated_converged_flag,
         )
 
         return np.any(updated_converged_flag)
 
-    except Exception as e:             
-        warnings.warn(f"Bracketing method failed: {e}. Skipping to the next solver.")
+    except Exception as e:
+        warnings.warn(f"Bracketing method failed: {e}. Skipping to the next solver.", stacklevel=2)
         return False
 
 
@@ -1268,24 +1313,24 @@ def _try_back_up_open_vectorised(
     tol: float,
     max_iter: int,
     func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]],
-    func_prime: Optional[Callable[[float], float]]
+    func_prime: Optional[Callable[[float], float]],
 ) -> bool:
     """
     Apply an open method solver to unconverged elements in vectorized results.
-    
+
     Extracts unconverged elements from the full arrays, applies the specified
     open method root-finding solver (e.g., Newton-Raphson, secant) to those
     elements only, and updates the original results in-place for elements that
     converge.
-    
+
     Open methods use iteration from an initial guess without requiring brackets,
     making them faster than bracket methods when the initial guess is good but
     less robust when far from the root.
-    
+
     This function serves as a helper for `_try_back_up_vectorised`, handling the
     index manipulation and partial array updates required for efficient vectorized
     backup solver application with open methods.
-    
+
     Parameters
     ----------
     back_up_solver : Solver
@@ -1293,7 +1338,7 @@ def _try_back_up_open_vectorised(
         type). Must have a `find_root` method that accepts an initial guess (x0)
         and optionally a derivative (func_prime), returning (roots, iterations,
         converged) tuple.
-        
+
         Compatible solvers: Newton-Raphson, Secant, or any hybrid solver used in
         open mode.
     func : Callable[[float], float]
@@ -1306,7 +1351,7 @@ def _try_back_up_open_vectorised(
         - results[0]: Root values (float64), NaN for unconverged
         - results[1]: Iteration counts (int64)
         - results[2]: Convergence flags (bool)
-        
+
         Only elements at `unconverged_idx` positions may be modified.
     x0 : array_like
         Initial guesses for all elements (full array). Must have the same length
@@ -1317,7 +1362,7 @@ def _try_back_up_open_vectorised(
         Integer indices of unconverged elements in the results arrays. Typically
         obtained via `np.where(~converged_flag)[0]`. Only these elements are
         passed to the solver.
-        
+
         Example: If converged = [True, False, True, False], then
         unconverged_idx = [1, 3]
     tol : float
@@ -1333,7 +1378,7 @@ def _try_back_up_open_vectorised(
         - None: No additional parameters
         - 1D array: Same parameters for all elements
         - 2D array: func_params[i] contains parameters for element i
-        
+
         Only rows corresponding to unconverged_idx are extracted and passed to
         the solver. Default is None.
     func_prime : Callable[[float], float], optional
@@ -1341,17 +1386,17 @@ def _try_back_up_open_vectorised(
         methods like Newton-Raphson. Should be decorated with `@njit` for
         compatibility. Called element-wise during iteration. If None, derivative-free
         methods (like secant) must be used. Default is None.
-    
+
     Returns
     -------
     success : bool
         True if at least one previously unconverged element converged with this
         solver, False if all unconverged elements remained unconverged or if an
         exception occurred.
-        
+
         This return value helps the calling function decide whether to continue
         to the next solver in the chain.
-    
+
     Notes
     -----
     Algorithm Steps:
@@ -1361,84 +1406,67 @@ def _try_back_up_open_vectorised(
     4. Map back to original indices: unconverged_idx[newly_converged_mask]
     5. Update original arrays in-place at those positions only
     6. Return True if any converged, False otherwise
-    
-    Open vs. Bracket Methods:
-    - Open methods: Start from x0, iterate without bounds checking
-      + Advantages: Very fast when x0 is near root, quadratic convergence (Newton)
-      + Disadvantages: Can diverge if x0 is far from root or derivative is zero
-    - Bracket methods: Maintain interval [a, b] containing root
-      + Advantages: Guaranteed convergence if func(a)*func(b) < 0
-      + Disadvantages: Slower, typically linear convergence
-    
+
+
     Index Mapping:
     The function performs a two-level index mapping identical to the bracket version:
     - Level 1: unconverged_idx maps from subset → full array
     - Level 2: updated_converged_flag identifies successes within subset
     - Combined: unconverged_idx[updated_converged_flag] gives final positions
-    
+
     Example index mapping:
         Full array size: 5
         converged_flag = [True, False, True, False, False]
         unconverged_idx = [1, 3, 4]  # Positions of False values
-        
+
         After solver:
         updated_converged_flag = [False, True, True]  # For indices [1,3,4]
-        
+
         Newly converged positions in full array:
         unconverged_idx[[False, True, True]] = [3, 4]
-    
+
     In-Place Modification:
     The results tuple arrays are modified in-place. The function does not create
     new arrays but updates existing ones. This is memory-efficient but means the
     caller's arrays are changed.
-    
-    Numba JIT Compilation:
-    Functions passed to this method (func and func_prime) must be JIT-compiled
-    with Numba's `@njit` decorator for compatibility with the solver infrastructure.
-    Regular Python functions will cause errors.
-    
+
+
     Error Handling:
     - Any exception during solver execution is caught
     - A warning is issued with the error message
     - Function returns False to indicate no convergence
     - Original results remain unchanged on exception
-    
-    Common failure modes for open methods:
-    - Initial guess too far from root (divergence)
-    - Derivative zero or near-zero (Newton fails)
-    - Function not smooth at x0 (iteration fails)
-    - Oscillation between points without converging
-    
+
     Examples
     --------
     Basic usage with Newton-Raphson:
-    
+
     >>> import numpy as np
     >>> from numba import njit
     >>> from meteorological_equations.math.solvers import NewtonRaphsonSolver
-    >>> 
+    >>>
     >>> @njit
     ... def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> @njit
     ... def f_prime(x):
     ...     return 3 * x**2
-    >>> 
+    >>>
     >>> # Setup: 5 elements, 3 unconverged
     >>> roots = np.array([2.0, np.nan, 1.5, np.nan, np.nan])
     >>> iters = np.array([5, 100, 8, 100, 100])
     >>> conv = np.array([True, False, True, False, False])
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Identify unconverged
     >>> unconverged_idx = np.where(~conv)[0]
     >>> print(f"Unconverged indices: {unconverged_idx}")
     Unconverged indices: [1 3 4]
-    >>> 
+    >>>
     >>> # Initial guesses (full array)
     >>> x0 = np.array([2.0, 2.5, 1.5, 1.8, 2.2])
-    >>> 
+    >>>
     >>> # Apply Newton-Raphson to unconverged elements
     >>> solver = NewtonRaphsonSolver()
     >>> success = _try_back_up_open_vectorised(
@@ -1452,7 +1480,7 @@ def _try_back_up_open_vectorised(
     ...     func_params=None,
     ...     func_prime=f_prime
     ... )
-    >>> 
+    >>>
     >>> print(f"At least one converged: {success}")
     At least one converged: True
     >>> print(f"Updated convergence: {conv}")
@@ -1461,120 +1489,120 @@ def _try_back_up_open_vectorised(
     All roots near 2.0: True
     >>> print(f"Newton is fast - low iterations: {iters[1] < 10}")
     Newton is fast - low iterations: True
-    
+
     Secant method (derivative-free):
-    
+
     >>> from meteorological_equations.math.solvers import SecantSolver
-    >>> 
+    >>>
     >>> @njit
     ... def f(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> roots = np.full(3, np.nan)
     >>> iters = np.full(3, 100)
     >>> conv = np.full(3, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Secant doesn't need derivative
     >>> x0 = np.array([1.5, 2.5, 1.0])
     >>> unconverged_idx = np.array([0, 1, 2])
-    >>> 
+    >>>
     >>> solver = SecantSolver()
     >>> success = _try_back_up_open_vectorised(
     ...     solver, f, results, x0, unconverged_idx,
     ...     1e-6, 50, None, None  # No func_prime needed
     ... )
-    >>> 
+    >>>
     >>> print(f"Secant converged: {success}")
     Secant converged: True
     >>> print(f"Roots: {roots}")
     Roots: [2. 2. 2.]
-    
+
     With function parameters:
-    
+
     >>> @njit
     ... def parametric_func(x, a, b):
     ...     return a * x**2 + b
-    >>> 
+    >>>
     >>> @njit
     ... def parametric_prime(x, a, b):
     ...     return 2 * a * x
-    >>> 
+    >>>
     >>> roots = np.full(2, np.nan)
     >>> iters = np.full(2, 100)
     >>> conv = np.full(2, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Solve a*x^2 + b = 0 with different (a, b) per element
     >>> func_params = np.array([
     ...     [1.0, -4.0],   # x^2 - 4 = 0, root at ±2
     ...     [2.0, -8.0],   # 2x^2 - 8 = 0, root at ±2
     ... ])
-    >>> 
+    >>>
     >>> x0 = np.array([1.5, 1.5])  # Initial guesses
     >>> unconverged_idx = np.array([0, 1])
-    >>> 
+    >>>
     >>> solver = NewtonRaphsonSolver()
     >>> success = _try_back_up_open_vectorised(
     ...     solver, parametric_func, results, x0, unconverged_idx,
     ...     1e-8, 50, func_params, parametric_prime
     ... )
-    >>> 
+    >>>
     >>> print(f"Both converged: {np.all(conv)}")
     Both converged: True
     >>> print(f"Roots: {roots}")
     Roots: [2. 2.]
-    
+
     Poor initial guess causing divergence:
-    
+
     >>> @njit
     ... def difficult_func(x):
     ...     return np.tan(x)  # Has vertical asymptotes
-    >>> 
-    >>> @njit  
+    >>>
+    >>> @njit
     ... def difficult_prime(x):
     ...     return 1.0 / np.cos(x)**2
-    >>> 
+    >>>
     >>> roots = np.full(2, np.nan)
     >>> iters = np.full(2, 100)
     >>> conv = np.full(2, False)
     >>> results = (roots, iters, conv)
-    >>> 
+    >>>
     >>> # Bad initial guess near asymptote at π/2 ≈ 1.57
     >>> x0 = np.array([1.5, 1.55])  # Very close to asymptote
     >>> unconverged_idx = np.array([0, 1])
-    >>> 
+    >>>
     >>> solver = NewtonRaphsonSolver()
     >>> success = _try_back_up_open_vectorised(
     ...     solver, difficult_func, results, x0, unconverged_idx,
     ...     1e-6, 50, None, difficult_prime
     ... )
-    >>> 
+    >>>
     >>> # Newton may fail - derivative explodes near π/2
     >>> print(f"Success: {success}")  # Likely False
     Success: False
     >>> print(f"Convergence: {conv}")  # Likely [False False]
     Convergence: [False False]
-    
+
     Comparing open vs bracket methods:
-    
+
     >>> @njit
     ... def f(x):
     ...     return x**3 - 8
-    >>> 
+    >>>
     >>> @njit
     ... def f_prime(x):
     ...     return 3 * x**2
-    >>> 
+    >>>
     >>> # Same problem, two approaches
     >>> roots_newton = np.full(1000, np.nan)
     >>> iters_newton = np.full(1000, 100)
     >>> conv_newton = np.full(1000, False)
-    >>> 
+    >>>
     >>> x0 = np.random.uniform(1.5, 2.5, 1000)  # Good guesses
-    >>> 
+    >>>
     >>> import time
-    >>> 
+    >>>
     >>> # Newton (open method)
     >>> start = time.time()
     >>> solver = NewtonRaphsonSolver()
@@ -1583,54 +1611,54 @@ def _try_back_up_open_vectorised(
     ...     x0, np.arange(1000), 1e-8, 50, None, f_prime
     ... )
     >>> newton_time = time.time() - start
-    >>> 
+    >>>
     >>> print(f"Newton: {newton_time:.4f}s, "
     ...       f"avg iters: {iters_newton[conv_newton].mean():.1f}")
     Newton: 0.0523s, avg iters: 4.2
-    >>> 
+    >>>
     >>> # vs. Brent (bracket method) - would be ~2-3x slower
     >>> # but more robust with poor initial guesses
-    
+
     Partial convergence:
-    
+
     >>> @njit
     ... def f(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> @njit
     ... def f_prime(x):
     ...     return 2 * x
-    >>> 
+    >>>
     >>> roots = np.full(4, np.nan)
     >>> iters = np.full(4, 100)
     >>> conv = np.full(4, False)
-    >>> 
+    >>>
     >>> # Mix of good and bad initial guesses
     >>> x0 = np.array([1.5, 0.0, 2.5, -10.0])
     >>> # x0[1]=0 has zero derivative - Newton will fail
     >>> # x0[3]=-10 is far, but will converge (eventually)
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([0, 1, 2, 3])
-    >>> 
+    >>>
     >>> solver = NewtonRaphsonSolver()
     >>> success = _try_back_up_open_vectorised(
     ...     solver, f, (roots, iters, conv),
     ...     x0, unconverged_idx, 1e-6, 50, None, f_prime
     ... )
-    >>> 
+    >>>
     >>> print(f"Partial success: {success}")  # True (some converged)
     Partial success: True
     >>> print(f"Which converged: {conv}")
     Which converged: [True False True True]
     >>> # Element 1 failed due to zero derivative at x0=0
-    
+
     See Also
     --------
     _try_back_up_bracket_vectorised : Equivalent for bracket methods
     _try_back_up_vectorised : Main vectorized backup orchestrator
     _update_converged_results : Helper for in-place array updates
     _get_unconverged_func_params : Helper for extracting parameter subsets
-    
+
 
     Warnings
     --------
@@ -1643,7 +1671,6 @@ def _try_back_up_open_vectorised(
     """
 
     try:
-
         original_roots = results[0]
         original_iterations = results[1]
         original_converged_flag = results[2]
@@ -1652,9 +1679,8 @@ def _try_back_up_open_vectorised(
         x0_unconverged = x0[unconverged_idx]
 
         func_params_unconverged = _get_unconverged_func_params(
-            func_params=func_params,
-            unconverged_idx=unconverged_idx
-        ) 
+            func_params=func_params, unconverged_idx=unconverged_idx
+        )
 
         updated_roots, updated_iterations, updated_converged_flag = backup_solver.find_root(
             func=func,
@@ -1662,7 +1688,7 @@ def _try_back_up_open_vectorised(
             x0=x0_unconverged,
             func_params=func_params_unconverged,
             tol=tol,
-            max_iter=max_iter
+            max_iter=max_iter,
         )
 
         _update_converged_results(
@@ -1672,54 +1698,53 @@ def _try_back_up_open_vectorised(
             unconverged_idx=unconverged_idx,
             updated_roots=updated_roots,
             updated_iterations=updated_iterations,
-            updated_converged_flag=updated_converged_flag
+            updated_converged_flag=updated_converged_flag,
         )
 
         return np.any(updated_converged_flag)
 
     except Exception as e:
-        warnings.warn(f"Open method failed: {e}")
+        warnings.warn(f"Open method failed: {e}", stacklevel=2)
         return False
 
 
 def _get_unconverged_func_params(
-        func_params: Optional[Union[npt.ArrayLike, Tuple[float, ...]]],
-        unconverged_idx: npt.ArrayLike
+    func_params: Optional[Union[npt.ArrayLike, Tuple[float, ...]]], unconverged_idx: npt.ArrayLike
 ) -> Optional[npt.NDArray]:
     """
     Extract function parameters for unconverged elements only.
-    
+
     This utility function handles the index-based extraction of function parameters
     corresponding to unconverged elements. It's used by vectorized backup solvers to
     ensure that only the necessary parameter subset is passed to the solver, reducing
     memory usage and computation.
-    
+
     The function handles the common case where func_params is None (no additional
     parameters needed) and the array case where different parameters apply to
     different elements.
-    
+
     Parameters
     ----------
     func_params : array_like or tuple of floats, optional
         Function parameters for all elements. Can be:
-        
+
         - None: No additional parameters (function only depends on x)
         - 1D array/tuple: Same parameters used for all elements, e.g., (a, b)
           Returns the same parameters regardless of unconverged_idx
         - 2D array: Different parameters per element, shape (n_elements, n_params)
           func_params[i, :] contains parameters for element i
           Only rows at unconverged_idx positions are extracted
-        
+
         These parameters are passed to func as additional arguments:
         func(x, *params) where params comes from this array.
     unconverged_idx : array_like of int
         Integer indices specifying which elements are unconverged. Typically
         obtained from `np.where(~converged_flag)[0]`. These indices are used to
         extract the corresponding rows from func_params.
-        
-        Example: If unconverged_idx = [1, 3, 4], only func_params[1], 
+
+        Example: If unconverged_idx = [1, 3, 4], only func_params[1],
         func_params[3], and func_params[4] are returned.
-    
+
     Returns
     -------
     params_subset : ndarray or None
@@ -1727,53 +1752,53 @@ def _get_unconverged_func_params(
         - ndarray: Subset of parameters for unconverged elements only
           + 1D case: Returns original parameters unchanged (all elements share them)
           + 2D case: Returns func_params[unconverged_idx], shape (len(unconverged_idx), n_params)
-    
+
     Notes
     -----
     Behavior by Input Type:
-    
+
     1. func_params is None:
        - Returns None immediately
        - Solver will be called without additional parameters
-    
+
     2. func_params is 1D (shared parameters):
        - Converts to ndarray
        - Indexing with unconverged_idx returns same 1D array
        - All unconverged elements use same parameters
-    
+
     3. func_params is 2D (per-element parameters):
        - Converts to ndarray
        - Extracts rows: func_params[unconverged_idx]
        - Returns subset with shape (n_unconverged, n_params)
-    
+
     Type Conversion:
     The function always returns float64 arrays (when not None) to ensure
     compatibility with Numba JIT-compiled solvers that expect specific types.
-    
+
     Examples
     --------
     Case 1: No parameters (None):
-    
+
     >>> unconverged_idx = np.array([1, 3, 4])
     >>> result = _get_unconverged_func_params(None, unconverged_idx)
     >>> print(result)
     None
-    
+
     Case 2: Shared parameters (1D) - same for all elements:
-    
+
     >>> # All elements use (a=2.0, b=-8.0)
     >>> func_params = np.array([2.0, -8.0])
     >>> unconverged_idx = np.array([1, 3, 4])
-    >>> 
+    >>>
     >>> result = _get_unconverged_func_params(func_params, unconverged_idx)
     >>> print(result)
     [2. -8.]
     >>> print(result.shape)
     (2,)
     >>> # Same parameters returned for all unconverged elements
-    
+
     Case 3: Per-element parameters (2D) - different for each element:
-    
+
     >>> # 5 elements, each with (a, b) parameters
     >>> func_params = np.array([
     ...     [1.0, -4.0],   # Element 0: a=1, b=-4
@@ -1782,10 +1807,10 @@ def _get_unconverged_func_params(
     ...     [1.5, -6.0],   # Element 3: a=1.5, b=-6
     ...     [0.5, -2.0],   # Element 4: a=0.5, b=-2
     ... ])
-    >>> 
+    >>>
     >>> # Only elements 1, 3, 4 are unconverged
     >>> unconverged_idx = np.array([1, 3, 4])
-    >>> 
+    >>>
     >>> result = _get_unconverged_func_params(func_params, unconverged_idx)
     >>> print(result)
     [[ 2.  -8. ]
@@ -1794,26 +1819,26 @@ def _get_unconverged_func_params(
     >>> print(result.shape)
     (3, 2)
     >>> # Returns only rows [1, 3, 4] - parameters for unconverged elements
-    
+
     Realistic usage in backup solver context:
-    
+
     >>> from numba import njit
-    >>> 
+    >>>
     >>> @njit
     ... def parametric_func(x, a, b):
     ...     '''Solve a*x^2 + b = 0 for various (a, b) values.'''
     ...     return a * x**2 + b
-    >>> 
+    >>>
     >>> # 1000 elements with different parameters
     >>> n = 1000
     >>> func_params = np.random.randn(n, 2)
-    >>> 
+    >>>
     >>> # Only 50 elements unconverged
     >>> converged = np.random.rand(n) > 0.05
     >>> unconverged_idx = np.where(~converged)[0]
     >>> print(f"Unconverged: {len(unconverged_idx)} out of {n}")
     Unconverged: 50 out of 1000
-    >>> 
+    >>>
     >>> # Extract only what's needed
     >>> params_subset = _get_unconverged_func_params(func_params, unconverged_idx)
     >>> print(f"Original shape: {func_params.shape}")
@@ -1822,36 +1847,36 @@ def _get_unconverged_func_params(
     Subset shape: (50, 2)
     >>> print(f"Memory saved: {100*(1 - 50/1000):.1f}%")
     Memory saved: 95.0%
-    >>> 
+    >>>
     >>> # Now only pass 50 parameter sets to solver instead of 1000
-    
+
     Edge case - empty unconverged_idx:
-    
+
     >>> func_params = np.array([[1, 2], [3, 4], [5, 6]])
     >>> unconverged_idx = np.array([])  # Empty - all converged
-    >>> 
+    >>>
     >>> result = _get_unconverged_func_params(func_params, unconverged_idx)
     >>> print(result)
     []
     >>> print(result.shape)
     (0, 2)
     >>> # Returns empty array with correct parameter dimension
-    
+
     Type conversion from tuple:
-    
+
     >>> # Input as tuple instead of array
     >>> func_params = (2.0, -8.0)
     >>> unconverged_idx = np.array([0, 1, 2])
-    >>> 
+    >>>
     >>> result = _get_unconverged_func_params(func_params, unconverged_idx)
     >>> print(type(result))
     <class 'numpy.ndarray'>
     >>> print(result.dtype)
     float64
     >>> # Automatically converted to float64 ndarray
-    
+
     Integration with solver workflow:
-    
+
     >>> # Typical usage in _try_back_up_open_vectorised
     >>> def solver_workflow_example():
     ...     # Full arrays
@@ -1859,39 +1884,40 @@ def _get_unconverged_func_params(
     ...     func_params_full = np.array([
     ...         [1, -4], [2, -8], [3, -12], [1.5, -6], [0.5, -2]
     ...     ])
-    ...     
+    ...
     ...     # Find unconverged
     ...     converged = ~np.isnan(roots)
     ...     unconverged_idx = np.where(~converged)[0]
     ...     print(f"Unconverged indices: {unconverged_idx}")
-    ...     
+    ...
     ...     # Extract only unconverged parameters
     ...     params_subset = _get_unconverged_func_params(
     ...         func_params_full, unconverged_idx
     ...     )
     ...     print(f"Parameters for unconverged: {params_subset}")
-    ...     
+    ...
     ...     # Pass to solver - only 3 parameter sets instead of 5
     ...     # result = solver.find_root(..., func_params=params_subset)
-    >>> 
+    >>>
     >>> solver_workflow_example()
     Unconverged indices: [1 3 4]
     Parameters for unconverged: [[ 2.  -8. ]
      [ 1.5 -6. ]
      [ 0.5 -2. ]]
-    
+
     See Also
     --------
     _update_converged_results : Counterpart function for updating results
     _try_back_up_open_vectorised : Uses this for open method parameters
     _try_back_up_bracket_vectorised : Uses this for bracket method parameters
-    
+
     """
     if func_params is not None:
         func_params = np.asarray(func_params, dtype=np.float64)
         return func_params[unconverged_idx]
-    
+
     return None
+
 
 def _update_converged_results(
     roots: npt.NDArray,
@@ -1900,20 +1926,20 @@ def _update_converged_results(
     unconverged_idx: npt.NDArray,
     updated_roots: npt.NDArray,
     updated_iterations: npt.NDArray,
-    updated_converged_flag: npt.NDArray
+    updated_converged_flag: npt.NDArray,
 ) -> None:
     """
     Update original result arrays in-place with newly converged elements.
-    
+
     Performs selective in-place updates of the original full-size result arrays,
     replacing only the elements that newly converged during a backup solver attempt.
     This function handles the critical index mapping from the unconverged subset
     back to the original array positions.
-    
+
     The function modifies the input arrays directly (in-place) and returns None,
     following NumPy conventions for in-place operations. This approach is memory-
     efficient and allows the calling function to see updates immediately.
-    
+
     Parameters
     ----------
     roots : ndarray
@@ -1932,7 +1958,7 @@ def _update_converged_results(
         Integer indices mapping from the subset (updated_*) to the full arrays.
         These are the positions in the original arrays that were unconverged
         before this solver attempt.
-        
+
         Example: If unconverged_idx = [1, 3, 4], then:
         - updated_roots[0] corresponds to roots[1]
         - updated_roots[1] corresponds to roots[3]
@@ -1949,97 +1975,97 @@ def _update_converged_results(
         Boolean array indicating which elements in the subset converged (bool).
         Length equals len(unconverged_idx). True means the solver succeeded for
         that element; False means it failed and should be left for the next backup.
-    
+
     Returns
     -------
     None
         This function modifies the input arrays in-place and returns nothing.
         After execution, roots, iterations, and converged_flag will contain
         updated values for newly converged elements.
-    
+
     Notes
     -----
     Two-Level Index Mapping:
-    
+
     The function performs a two-stage index mapping to update only the elements
     that both (a) were unconverged before, and (b) converged during this attempt:
-    
+
     1. Level 1 - Subset to Full Mapping:
        unconverged_idx maps from subset positions to full array positions
        Example: unconverged_idx[0] = 1 means subset[0] goes to full[1]
-    
+
     2. Level 2 - Success Filtering:
        updated_converged_flag identifies which subset elements succeeded
        Example: updated_converged_flag = [True, False, True] means subset
        elements 0 and 2 succeeded, but 1 failed
-    
+
     3. Combined Mapping:
        unconverged_idx[updated_converged_flag] gives final update positions
        Example: unconverged_idx[[True, False, True]] = [1, 4] (if unconverged_idx=[1,3,4])
        Only positions 1 and 4 in the full array get updated
-    
+
     Visual Example:
-    
+
     Before solver attempt:
         Full arrays (length 5):
         roots = [2.0, NaN, 1.5, NaN, NaN]
         converged = [T, F, T, F, F]
         unconverged_idx = [1, 3, 4]
-    
+
     After solver processes unconverged subset:
         Subset arrays (length 3):
         updated_roots = [2.0, NaN, 2.1]  # positions [1,3,4] attempted
         updated_converged = [T, F, T]     # positions 1,4 succeeded; 3 failed
-    
+
     Index mapping:
         updated_converged_mask = [T, F, T]
         newly_converged_original_idx = unconverged_idx[[T,F,T]] = [1, 4]
-    
+
     After _update_converged_results:
         Full arrays updated:
         roots = [2.0, 2.0, 1.5, NaN, 2.1]  # positions 1,4 updated
         converged = [T, T, T, F, T]        # positions 1,4 set to True
-    
+
     In-Place Modification:
     All modifications happen in-place using NumPy's advanced indexing:
     - roots[idx] = values  # Updates specific positions
     - No new arrays created
     - Caller's arrays are modified directly
     - Memory-efficient for large datasets
-    
+
     Why In-Place?
     1. Memory efficiency: No copying of large arrays
     2. Immediate visibility: Caller sees updates instantly
     3. Multiple iterations: Same arrays updated repeatedly in loop
     4. NumPy convention: In-place operations return None
-    
+
     Partial Updates:
     This function is designed to handle partial convergence gracefully:
     - Some elements may converge (updated_converged_flag = True)
     - Others may fail (updated_converged_flag = False)
     - Only successful elements are updated
     - Failed elements remain unchanged for next backup attempt
-    
+
     Examples
     --------
     Basic usage - some elements converge:
-    
+
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Original full arrays (5 elements, 3 unconverged)
     >>> roots = np.array([2.0, np.nan, 1.5, np.nan, np.nan])
     >>> iters = np.array([8, 100, 10, 100, 100])
     >>> conv = np.array([True, False, True, False, False])
-    >>> 
+    >>>
     >>> # Indices of unconverged elements
     >>> unconverged_idx = np.array([1, 3, 4])
-    >>> 
+    >>>
     >>> # Results from backup solver (on unconverged subset)
     >>> updated_roots = np.array([2.0, np.nan, 2.1])
     >>> updated_iters = np.array([6, 50, 8])
     >>> updated_conv = np.array([True, False, True])
     >>> # Elements 0 and 2 of subset converged (original positions 1 and 4)
-    >>> 
+    >>>
     >>> # Update original arrays
     >>> _update_converged_results(
     ...     roots=roots,
@@ -2050,7 +2076,7 @@ def _update_converged_results(
     ...     updated_iterations=updated_iters,
     ...     updated_converged_flag=updated_conv
     ... )
-    >>> 
+    >>>
     >>> # Check results
     >>> print(f"Roots: {roots}")
     Roots: [2.  2.  1.5 nan 2.1]
@@ -2059,68 +2085,68 @@ def _update_converged_results(
     >>> print(f"Iterations: {iters}")
     Iterations: [  8   6  10 100   8]
     >>> # Positions 1 and 4 updated; position 3 still NaN (failed to converge)
-    
+
     All elements converge:
-    
+
     >>> roots = np.full(3, np.nan)
     >>> iters = np.full(3, 100)
     >>> conv = np.full(3, False)
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([0, 1, 2])
     >>> updated_roots = np.array([1.0, 2.0, 3.0])
     >>> updated_iters = np.array([5, 7, 4])
     >>> updated_conv = np.array([True, True, True])
-    >>> 
+    >>>
     >>> _update_converged_results(
     ...     roots, iters, conv, unconverged_idx,
     ...     updated_roots, updated_iters, updated_conv
     ... )
-    >>> 
+    >>>
     >>> print(f"All converged: {np.all(conv)}")
     All converged: True
     >>> print(f"All roots filled: {not np.any(np.isnan(roots))}")
     All roots filled: True
     >>> print(f"Roots: {roots}")
     Roots: [1. 2. 3.]
-    
+
     No elements converge (all failed):
-    
+
     >>> roots = np.array([np.nan, np.nan, np.nan])
     >>> iters = np.array([100, 100, 100])
     >>> conv = np.array([False, False, False])
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([0, 1, 2])
     >>> updated_roots = np.array([np.nan, np.nan, np.nan])
     >>> updated_iters = np.array([50, 50, 50])
     >>> updated_conv = np.array([False, False, False])
-    >>> 
+    >>>
     >>> # Make copies to check nothing changed
     >>> roots_before = roots.copy()
     >>> conv_before = conv.copy()
-    >>> 
+    >>>
     >>> _update_converged_results(
     ...     roots, iters, conv, unconverged_idx,
     ...     updated_roots, updated_iters, updated_conv
     ... )
-    >>> 
+    >>>
     >>> # Nothing should change (no successes to update)
     >>> print(f"Roots unchanged: {np.array_equal(roots, roots_before, equal_nan=True)}")
     Roots unchanged: True
     >>> print(f"Convergence unchanged: {np.array_equal(conv, conv_before)}")
     Convergence unchanged: True
     >>> # Iterations might update even for failures (depending on solver)
-    
+
     Demonstrating index mapping:
-    
+
     >>> # Start: 6 elements, 4 unconverged at positions [1, 2, 4, 5]
     >>> roots = np.array([1.0, np.nan, np.nan, 3.0, np.nan, np.nan])
     >>> iters = np.array([5, 100, 100, 8, 100, 100])
     >>> conv = np.array([True, False, False, True, False, False])
-    >>> 
+    >>>
     >>> unconverged_idx = np.array([1, 2, 4, 5])
     >>> print(f"Attempting to solve positions: {unconverged_idx}")
     Attempting to solve positions: [1 2 4 5]
-    >>> 
+    >>>
     >>> # Solver results: positions 0 and 3 of subset succeed
     >>> # (corresponding to original positions 1 and 5)
     >>> updated_roots = np.array([2.0, np.nan, np.nan, 5.0])
@@ -2128,120 +2154,120 @@ def _update_converged_results(
     >>> updated_conv = np.array([True, False, False, True])
     >>> print(f"Subset convergence: {updated_conv}")
     Subset convergence: [ True False False  True]
-    >>> 
+    >>>
     >>> # Update
     >>> _update_converged_results(
     ...     roots, iters, conv, unconverged_idx,
     ...     updated_roots, updated_iters, updated_conv
     ... )
-    >>> 
+    >>>
     >>> print(f"Final roots: {roots}")
     Final roots: [1. 2. nan 3. nan 5.]
     >>> print(f"Final convergence: {conv}")
     Final convergence: [ True  True False  True False  True]
     >>> # Positions 1 and 5 updated (mapped from subset indices 0 and 3)
     >>> # Positions 2 and 4 still unconverged (subset indices 1 and 2 failed)
-    
+
     Large-scale realistic example:
-    
+
     >>> # 10,000 elements, 500 unconverged
     >>> n_total = 10000
     >>> n_unconverged = 500
-    >>> 
+    >>>
     >>> roots = np.random.randn(n_total)
     >>> iters = np.random.randint(5, 50, n_total)
     >>> conv = np.ones(n_total, dtype=bool)
-    >>> 
+    >>>
     >>> # Mark 500 random positions as unconverged
     >>> unconverged_idx = np.random.choice(n_total, n_unconverged, replace=False)
     >>> roots[unconverged_idx] = np.nan
     >>> conv[unconverged_idx] = False
     >>> iters[unconverged_idx] = 100
-    >>> 
+    >>>
     >>> # Simulate solver: 80% success rate
     >>> updated_roots = np.random.randn(n_unconverged)
     >>> updated_iters = np.random.randint(5, 30, n_unconverged)
     >>> updated_conv = np.random.rand(n_unconverged) < 0.8
-    >>> 
+    >>>
     >>> n_newly_converged = np.sum(updated_conv)
     >>> print(f"Solver converged {n_newly_converged}/{n_unconverged} elements")
     Solver converged 402/500 elements
-    >>> 
+    >>>
     >>> # Update
     >>> _update_converged_results(
     ...     roots, iters, conv, unconverged_idx,
     ...     updated_roots, updated_iters, updated_conv
     ... )
-    >>> 
+    >>>
     >>> n_still_unconverged = np.sum(~conv)
     >>> print(f"Still unconverged: {n_still_unconverged}")
     Still unconverged: 98
     >>> print(f"Total converged: {np.sum(conv)}/{n_total}")
     Total converged: 9902/10000
-    
+
     Edge case - empty update (all already converged):
-    
+
     >>> roots = np.array([1.0, 2.0, 3.0])
     >>> iters = np.array([5, 6, 7])
     >>> conv = np.array([True, True, True])
-    >>> 
+    >>>
     >>> # Empty unconverged
     >>> unconverged_idx = np.array([], dtype=int)
     >>> updated_roots = np.array([])
     >>> updated_iters = np.array([])
     >>> updated_conv = np.array([], dtype=bool)
-    >>> 
+    >>>
     >>> _update_converged_results(
     ...     roots, iters, conv, unconverged_idx,
     ...     updated_roots, updated_iters, updated_conv
     ... )
-    >>> 
+    >>>
     >>> # Nothing changes (no elements to update)
     >>> print(f"Roots unchanged: {np.array_equal(roots, [1., 2., 3.])}")
     Roots unchanged: True
-    
+
     Integration with backup solver workflow:
-    
+
     >>> def backup_solver_example():
     ...     '''Demonstrates typical usage in backup solver chain.'''
     ...     # Initial state
     ...     roots = np.array([2.0, np.nan, np.nan, 1.5, np.nan])
     ...     iters = np.array([8, 100, 100, 10, 100])
     ...     conv = np.array([True, False, False, True, False])
-    ...     
+    ...
     ...     print(f"Initial: {np.sum(conv)}/5 converged")
-    ...     
+    ...
     ...     # Try first backup solver (e.g., Brent)
     ...     unconverged_idx = np.where(~conv)[0]
     ...     print(f"Trying Brent on positions: {unconverged_idx}")
-    ...     
+    ...
     ...     # Simulate Brent results (2 out of 3 converge)
     ...     updated_roots = np.array([2.0, 2.1, np.nan])
     ...     updated_iters = np.array([6, 8, 50])
     ...     updated_conv = np.array([True, True, False])
-    ...     
+    ...
     ...     _update_converged_results(
     ...         roots, iters, conv, unconverged_idx,
     ...         updated_roots, updated_iters, updated_conv
     ...     )
     ...     print(f"After Brent: {np.sum(conv)}/5 converged")
-    ...     
+    ...
     ...     # Try second backup solver (e.g., Bisection) on remaining
     ...     unconverged_idx = np.where(~conv)[0]
     ...     print(f"Trying Bisection on positions: {unconverged_idx}")
-    ...     
+    ...
     ...     # Simulate Bisection results (last one converges)
     ...     updated_roots = np.array([2.0])
     ...     updated_iters = np.array([15])
     ...     updated_conv = np.array([True])
-    ...     
+    ...
     ...     _update_converged_results(
     ...         roots, iters, conv, unconverged_idx,
     ...         updated_roots, updated_iters, updated_conv
     ...     )
     ...     print(f"After Bisection: {np.sum(conv)}/5 converged")
     ...     print(f"Final roots: {roots}")
-    >>> 
+    >>>
     >>> backup_solver_example()
     Initial: 2/5 converged
     Trying Brent on positions: [1 2 4]
@@ -2249,7 +2275,7 @@ def _update_converged_results(
     Trying Bisection on positions: [2]
     After Bisection: 5/5 converged
     Final roots: [2.  2.  2.  1.5 2. ]
-    
+
     See Also
     --------
     _get_unconverged_func_params : Counterpart for extracting subsets
@@ -2259,8 +2285,7 @@ def _update_converged_results(
     """
     updated_converged_mask = updated_converged_flag
     updated_converged_original_idx = unconverged_idx[updated_converged_mask]
-    
-    
+
     roots[updated_converged_original_idx] = updated_roots[updated_converged_mask]
     iterations[updated_converged_original_idx] = updated_iterations[updated_converged_mask]
     converged_flag[updated_converged_original_idx] = True
