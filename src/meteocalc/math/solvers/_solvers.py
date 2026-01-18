@@ -56,7 +56,32 @@ class Solver(ABC):
         """
         Returns the method type of the solver
         """
-        return self.method_type.value
+        return self.method_type
+
+    @staticmethod
+    def _prepare_scalar_params(
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]],
+    ) -> Tuple[float, ...]:
+        """
+        Ensures that that params can be unpacked with the * operator
+
+        Args:
+            - func_params(Optional[Union[Tuple[float, ...], ArrayLike]]) = Optional parameters
+        Returns:
+            - Tuple for unpacking in args
+        """
+
+        if func_params is None:
+            return ()
+
+        if isinstance(func_params, tuple):
+            return func_params
+
+        if isinstance(func_params, (list, np.ndarray)):
+            arr = np.asarray(func_params).flatten()
+            return tuple(arr)
+
+        return func_params
 
     def _dispatch_root_bracket_method(
         self,
@@ -65,6 +90,7 @@ class Solver(ABC):
         b: Union[float, npt.ArrayLike],
         scalar_bracket_method_func: BracketRootMethodScalar,
         vector_bracket_method_func: BracketRootMethodVectorised,
+        func_params: Union[Optional[npt.ArrayLike], Tuple[float, ...]] = None,
         tol: float = 1e-6,
         max_iter: int = 50,
     ) -> Union[
@@ -90,7 +116,8 @@ class Solver(ABC):
         b_arr = np.asarray(b, dtype=np.float64)
 
         if a_arr.ndim == 0:
-            return scalar_bracket_method_func(func=func, a=a, b=b, tol=tol, max_iter=max_iter)
+            params = self._prepare_scalar_params(func_params=func_params)
+            return scalar_bracket_method_func(func, a, b, tol, max_iter, *params)
 
         else:
             original_shape = a_arr.shape
@@ -98,7 +125,12 @@ class Solver(ABC):
             b_flatten = b_arr.flatten()
 
             roots, iterations, converged_flags = vector_bracket_method_func(
-                func=func, a=a_flatten, b=b_flatten, tol=tol, max_iter=max_iter
+                func=func,
+                a=a_flatten,
+                b=b_flatten,
+                func_params=func_params,
+                tol=tol,
+                max_iter=max_iter,
             )
 
             roots = np.asarray(roots, dtype=np.float64)
@@ -118,6 +150,7 @@ class Solver(ABC):
         x0: Union[npt.ArrayLike, float],
         scalar_open_method_func: OpenRootMethodScalar,
         vectorised_open_method_func: OpenRootMethodVectorised,
+        func_params: Optional[Union[npt.ArrayLike, Tuple[float, ...]]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
     ) -> Union[
@@ -130,12 +163,11 @@ class Solver(ABC):
         initial_guess_arr = np.asarray(x0, dtype=np.float64)
 
         if initial_guess_arr.ndim == 0:
+            params = self._prepare_scalar_params(func_params=func_params)
             if func_prime is not None:
-                return scalar_open_method_func(
-                    func=func, func_prime=func_prime, x0=x0, tol=tol, max_iter=max_iter
-                )
+                return scalar_open_method_func(func, func_prime, x0, tol, max_iter, *params)
             else:
-                return scalar_open_method_func(func=func, x0=x0, tol=tol, max_iter=max_iter)
+                return scalar_open_method_func(func, x0, tol, max_iter, *params)
 
         else:
             original_shape = initial_guess_arr.shape
@@ -143,11 +175,16 @@ class Solver(ABC):
 
             if func_prime is not None:
                 roots, iterations, converged_flags = vectorised_open_method_func(
-                    func=func, func_prime=func_prime, x0=x0_flatten, tol=tol, max_iter=max_iter
+                    func=func,
+                    func_prime=func_prime,
+                    x0=x0_flatten,
+                    func_params=func_params,
+                    tol=tol,
+                    max_iter=max_iter,
                 )
             else:
                 roots, iterations, converged_flags = vectorised_open_method_func(
-                    func=func, x0=x0_flatten, tol=tol, max_iter=max_iter
+                    func=func, x0=x0_flatten, func_params=func_params, tol=tol, max_iter=max_iter
                 )
 
             roots = np.asarray(roots, dtype=np.float64)
@@ -182,9 +219,13 @@ class NewtonRaphsonSolver(Solver):
         func: Callable[[float], float],
         func_prime: Callable[[float], float],
         x0: Union[float, npt.ArrayLike],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 50,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Newton Raphson Method.
 
@@ -204,6 +245,7 @@ class NewtonRaphsonSolver(Solver):
             x0=x0,
             scalar_open_method_func=_newton_raphson_scalar,
             vectorised_open_method_func=_newton_raphson_vectorised,
+            func_params=func_params,
             tol=tol,
             max_iter=max_iter,
         )
@@ -223,9 +265,13 @@ class BisectionSolver(Solver):
         func: Callable[[float], float],
         a: Union[npt.ArrayLike, float],
         b: Union[npt.ArrayLike, float],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Bisection Method.
 
@@ -244,6 +290,7 @@ class BisectionSolver(Solver):
             func=func,
             a=a,
             b=b,
+            func_params=func_params,
             scalar_bracket_method_func=_bisection_scalar,
             vector_bracket_method_func=_bisection_vectorised,
             tol=tol,
@@ -266,9 +313,13 @@ class BrentSolver(Solver):
         func: Callable[[float], float],
         a: Union[npt.ArrayLike, float],
         b: Union[npt.ArrayLike, float],
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]] = None,
         tol: float = 1e-6,
         max_iter: int = 100,
-    ):
+    ) -> Union[
+        Tuple[float, int, bool],
+        Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]],
+    ]:
         """
         Finds the roots of a function using the Brent Method.
 
@@ -286,6 +337,7 @@ class BrentSolver(Solver):
             func=func,
             a=a,
             b=b,
+            func_params=func_params,
             scalar_bracket_method_func=_brent_scalar,
             vector_bracket_method_func=_brent_vectorised,
             tol=tol,
