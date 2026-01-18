@@ -155,9 +155,9 @@ class TestBasicFunctionality:
         assert np.all(conv), "All elements should converge"
 
         # All roots should be near 2.0
-        assert np.allclose(
-            roots, 2.0, atol=default_tolerance
-        ), f"Roots should be near 2.0, got {roots}"
+        assert np.allclose(roots, 2.0, atol=default_tolerance), (
+            f"Roots should be near 2.0, got {roots}"
+        )
 
         # Verify against SciPy
         scipy_roots = np.array([brentq(cubic_func, a[i], b[i]) for i in range(n)])
@@ -194,9 +194,9 @@ class TestBasicFunctionality:
 
         # Check new convergence
         assert np.all(conv), "All elements should now be converged"
-        assert np.allclose(
-            roots[[1, 3, 4]], 2.0, atol=default_tolerance
-        ), "Newly converged elements should be correct"
+        assert np.allclose(roots[[1, 3, 4]], 2.0, atol=default_tolerance), (
+            "Newly converged elements should be correct"
+        )
 
     def test_all_converged_early_return(self, default_tolerance, max_iterations):
         """Test early return when all elements already converged."""
@@ -264,9 +264,9 @@ class TestSciPyValidation:
         )
 
         assert np.all(conv), "All should converge"
-        assert np.allclose(
-            roots, scipy_roots, atol=1e-9
-        ), f"Max difference from SciPy: {np.max(np.abs(roots - scipy_roots))}"
+        assert np.allclose(roots, scipy_roots, atol=1e-9), (
+            f"Max difference from SciPy: {np.max(np.abs(roots - scipy_roots))}"
+        )
 
     def test_bisection_vs_scipy_bisect(self, default_tolerance):
         """Compare bisection method results with SciPy's bisect."""

@@ -134,15 +134,15 @@ class TestTryBackupOpenVectorised:
         # x^2 - 4 = 0 has TWO roots: +2 and -2
         # Positive x0 → +2, Negative x0 → -2
         expected_roots = np.array([2.0, 2.0, -2.0, 2.0, -2.0])
-        assert np.allclose(
-            roots, expected_roots, atol=1e-5
-        ), f"Expected {expected_roots}, got {roots}"
+        assert np.allclose(roots, expected_roots, atol=1e-5), (
+            f"Expected {expected_roots}, got {roots}"
+        )
 
         # Alternative: check that all roots satisfy x^2 - 4 = 0
         residuals = roots**2 - 4
-        assert np.all(
-            np.abs(residuals) < 1e-10
-        ), f"All roots should satisfy f(x)=0, residuals: {residuals}"
+        assert np.all(np.abs(residuals) < 1e-10), (
+            f"All roots should satisfy f(x)=0, residuals: {residuals}"
+        )
 
     def test_partial_convergence(self):
         """Test case where only some elements converge"""
@@ -227,9 +227,9 @@ class TestTryBackupOpenVectorised:
         print(f"Difference:  {np.abs(roots - scipy_roots)}")
 
         assert np.all(converged), "All should converge"
-        assert np.allclose(
-            roots, scipy_roots, atol=1e-8
-        ), f"Precision mismatch: yours={roots}, scipy={scipy_roots}"
+        assert np.allclose(roots, scipy_roots, atol=1e-8), (
+            f"Precision mismatch: yours={roots}, scipy={scipy_roots}"
+        )
 
     def test_multiple_functions(self):
         """Test with different mathematical functions"""
@@ -262,9 +262,9 @@ class TestTryBackupOpenVectorised:
 
             assert success
             assert np.all(converged)
-            assert np.allclose(
-                roots, expected_root, atol=1e-6
-            ), f"Expected {expected_root}, got {roots}"
+            assert np.allclose(roots, expected_root, atol=1e-6), (
+                f"Expected {expected_root}, got {roots}"
+            )
 
     def test_with_func_params(self):
         """Test with function parameters"""

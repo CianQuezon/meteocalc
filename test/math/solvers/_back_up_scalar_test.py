@@ -146,9 +146,9 @@ class TestDirectScipyComparison:
         # Compare
         print(f"\n✓ Quadratic: Your={result[0]:.10f}, SciPy={scipy_root:.10f}")
         assert result[2] is True, f"Should converge, got: {result}"
-        assert np.isclose(
-            result[0], scipy_root, atol=1e-5
-        ), f"Your: {result[0]:.10f}, SciPy: {scipy_root:.10f}"
+        assert np.isclose(result[0], scipy_root, atol=1e-5), (
+            f"Your: {result[0]:.10f}, SciPy: {scipy_root:.10f}"
+        )
 
     def test_cubic_brent_vs_scipy(self):
         """Cubic: x^3 - 2 = 0"""

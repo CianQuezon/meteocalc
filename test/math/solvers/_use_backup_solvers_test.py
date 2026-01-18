@@ -175,9 +175,9 @@ class TestScalarRouting:
         scipy_root = brentq(cubic_func, 0.0, 5.0, xtol=strict_tolerance)
 
         assert conv, "Should converge"
-        assert np.isclose(
-            root, scipy_root, atol=1e-12
-        ), f"Difference from SciPy: {abs(root - scipy_root)}"
+        assert np.isclose(root, scipy_root, atol=1e-12), (
+            f"Difference from SciPy: {abs(root - scipy_root)}"
+        )
 
     def test_scalar_vs_scipy_bisect(self, default_tolerance):
         """Compare scalar dispatch with SciPy bisect."""
@@ -305,9 +305,9 @@ class TestVectorizedRouting:
         )
 
         assert np.all(conv), "All should converge"
-        assert np.allclose(
-            roots, scipy_roots, atol=1e-11
-        ), f"Max difference from SciPy: {np.max(np.abs(roots - scipy_roots))}"
+        assert np.allclose(roots, scipy_roots, atol=1e-11), (
+            f"Max difference from SciPy: {np.max(np.abs(roots - scipy_roots))}"
+        )
 
     def test_vectorized_partial_convergence(self, default_tolerance, max_iterations):
         """Test vectorized with some elements already converged."""
@@ -538,9 +538,9 @@ class TestParametricFunctions:
         )
 
         assert np.all(conv), f"All should converge, got {conv}"
-        assert np.allclose(
-            roots, 2.0, atol=default_tolerance
-        ), f"All roots should be 2.0, got {roots}"
+        assert np.allclose(roots, 2.0, atol=default_tolerance), (
+            f"All roots should be 2.0, got {roots}"
+        )
 
     def test_vectorized_mixed_convergence_with_parameters(self, default_tolerance, max_iterations):
         """Test parameter handling with partial convergence."""
@@ -999,9 +999,9 @@ class TestComprehensiveIntegration:
         )
 
         # 1. Check preservation of pre-converged elements
-        assert np.allclose(
-            roots[originally_converged], 2.0, atol=1e-14
-        ), "Pre-converged elements should remain unchanged"
+        assert np.allclose(roots[originally_converged], 2.0, atol=1e-14), (
+            "Pre-converged elements should remain unchanged"
+        )
 
         # 2. Check high overall convergence
         convergence_rate = np.sum(conv) / n * 100
@@ -1011,9 +1011,9 @@ class TestComprehensiveIntegration:
         newly_converged = conv & ~originally_converged
         for i in np.where(newly_converged)[0]:
             scipy_root = brentq(cubic_func, a[i], b[i])
-            assert np.isclose(
-                roots[i], scipy_root, atol=1e-8
-            ), f"Element {i}: {roots[i]:.6f} vs SciPy {scipy_root:.6f}"
+            assert np.isclose(roots[i], scipy_root, atol=1e-8), (
+                f"Element {i}: {roots[i]:.6f} vs SciPy {scipy_root:.6f}"
+            )
 
     def test_vectorized_all_unconverged_full_chain(self, default_tolerance):
         """Test vectorized starting from all unconverged with full solver chain."""
@@ -1051,9 +1051,9 @@ class TestComprehensiveIntegration:
         for i in range(n):
             if conv[i]:
                 scipy_root = brentq(cubic_func, a[i], b[i], xtol=default_tolerance)
-                assert np.isclose(
-                    roots[i], scipy_root, atol=1e-8
-                ), f"Element {i} mismatch: {roots[i]:.10f} vs {scipy_root:.10f}"
+                assert np.isclose(roots[i], scipy_root, atol=1e-8), (
+                    f"Element {i} mismatch: {roots[i]:.10f} vs {scipy_root:.10f}"
+                )
 
                 # Also verify residual
                 residual = abs(cubic_func(roots[i]))

@@ -209,9 +209,9 @@ class TestTryBackupBracketVectorised:
         print(f"Difference:  {np.abs(roots - scipy_roots)}")
 
         assert np.all(converged), "All should converge"
-        assert np.allclose(
-            roots, scipy_roots, atol=1e-9
-        ), f"Precision mismatch: yours={roots}, scipy={scipy_roots}"
+        assert np.allclose(roots, scipy_roots, atol=1e-9), (
+            f"Precision mismatch: yours={roots}, scipy={scipy_roots}"
+        )
 
     def test_precision_vs_scipy_bisect(self):
         """Test numerical precision matches SciPy's bisect"""
@@ -285,9 +285,9 @@ class TestTryBackupBracketVectorised:
 
             assert success, f"Failed for function {func.__name__}"
             assert np.all(converged), f"Not all converged for {func.__name__}"
-            assert np.allclose(
-                roots, expected_root, atol=1e-6
-            ), f"Expected {expected_root}, got {roots} for {func.__name__}"
+            assert np.allclose(roots, expected_root, atol=1e-6), (
+                f"Expected {expected_root}, got {roots} for {func.__name__}"
+            )
 
     def test_with_func_params(self):
         """Test with function parameters"""
@@ -457,9 +457,9 @@ class TestTryBackupBracketVectorised:
 
             assert success, f"{name} should succeed"
             assert np.all(converged), f"All should converge with {name}"
-            assert np.allclose(
-                roots, 2.0, atol=1e-5
-            ), f"{name} should find root at 2.0, got {roots}"
+            assert np.allclose(roots, 2.0, atol=1e-5), (
+                f"{name} should find root at 2.0, got {roots}"
+            )
 
     def test_large_array(self):
         """Test with larger array (100 elements)"""
