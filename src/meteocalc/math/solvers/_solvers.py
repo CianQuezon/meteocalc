@@ -52,7 +52,6 @@ class Solver(ABC):
     method_type: MethodType
     name: SolverName
 
-
     def get_method_type(self) -> str:
         """
         Returns the method type of the solver
@@ -61,29 +60,28 @@ class Solver(ABC):
 
     @staticmethod
     def _prepare_scalar_params(
-            func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]]
+        func_params: Optional[Union[Tuple[float, ...], npt.ArrayLike]],
     ) -> Tuple[float, ...]:
         """
         Ensures that that params can be unpacked with the * operator
-        
+
         Args:
-            - func_params(Optional[Union[Tuple[float, ...], ArrayLike]]) = Optional parameters        
+            - func_params(Optional[Union[Tuple[float, ...], ArrayLike]]) = Optional parameters
         Returns:
             - Tuple for unpacking in args
         """
 
         if func_params is None:
             return ()
-        
+
         if isinstance(func_params, tuple):
             return func_params
-        
+
         if isinstance(func_params, (list, np.ndarray)):
             arr = np.asarray(func_params).flatten()
             return tuple(arr)
-        
-        return (func_params)
 
+        return func_params
 
     def _dispatch_root_bracket_method(
         self,
@@ -120,14 +118,19 @@ class Solver(ABC):
         if a_arr.ndim == 0:
             params = self._prepare_scalar_params(func_params=func_params)
             return scalar_bracket_method_func(func, a, b, tol, max_iter, *params)
-        
+
         else:
             original_shape = a_arr.shape
             a_flatten = a_arr.flatten()
             b_flatten = b_arr.flatten()
 
             roots, iterations, converged_flags = vector_bracket_method_func(
-                func=func, a=a_flatten, b=b_flatten, func_params=func_params, tol=tol, max_iter=max_iter
+                func=func,
+                a=a_flatten,
+                b=b_flatten,
+                func_params=func_params,
+                tol=tol,
+                max_iter=max_iter,
             )
 
             roots = np.asarray(roots, dtype=np.float64)
@@ -162,10 +165,7 @@ class Solver(ABC):
         if initial_guess_arr.ndim == 0:
             params = self._prepare_scalar_params(func_params=func_params)
             if func_prime is not None:
-                return scalar_open_method_func(
-                        func, func_prime, x0, tol, max_iter,
-                        *params
-                    )
+                return scalar_open_method_func(func, func_prime, x0, tol, max_iter, *params)
             else:
                 return scalar_open_method_func(func, x0, tol, max_iter, *params)
 
@@ -175,7 +175,12 @@ class Solver(ABC):
 
             if func_prime is not None:
                 roots, iterations, converged_flags = vectorised_open_method_func(
-                    func=func, func_prime=func_prime, x0=x0_flatten, func_params=func_params, tol=tol, max_iter=max_iter
+                    func=func,
+                    func_prime=func_prime,
+                    x0=x0_flatten,
+                    func_params=func_params,
+                    tol=tol,
+                    max_iter=max_iter,
                 )
             else:
                 roots, iterations, converged_flags = vectorised_open_method_func(
