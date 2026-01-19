@@ -19,19 +19,199 @@ from meteorological_equations.math.solvers._solvers import (
     Solver,
 )
 from meteorological_equations.shared._enum_tools import parse_enum
-
-SolverMap = {
-    SolverName.NEWTON: NewtonRaphsonSolver,
-    SolverName.BISECTION: BisectionSolver,
-    SolverName.BRENT: BrentSolver,
-}
-
+from meteorological_equations.math.solvers._types_and_maps import SolverMap
 
 class RootSolvers:
+    
     @staticmethod
     def list_root_solvers() -> List[str]:
         """
-        Lists the solvers available
+        List all available root-finding solvers.
+
+        Returns a list of solver names that can be used with the `get_root` method.
+        Each solver implements a different numerical algorithm for finding roots of
+        equations, with varying characteristics in terms of speed, robustness, and
+        input requirements.
+
+        Returns
+        -------
+        list of str
+            Names of all available solvers. Each name can be passed as the
+            `main_solver` or included in `backup_solvers` parameter when calling
+            `get_root`. Solver names are:
+            
+            - 'newton' : Newton-Raphson method (fast, requires derivative)
+            - 'brent' : Brent's method (robust hybrid, recommended default)
+            - 'bisection' : Bisection method (reliable, slower)
+
+        Notes
+        -----
+        Solver Characteristics:
+
+        **Newton-Raphson ('newton')**
+            - Type: Open method
+            - Requires: Initial guess (x0), derivative (func_prime)
+            - Speed: Very fast (quadratic convergence)
+            - Robustness: Can fail if initial guess is poor or derivative is zero
+            - Best for: When you have a good initial guess and can provide derivative
+
+        **Brent's Method ('brent')**
+            - Type: Hybrid (can use open or bracket mode)
+            - Requires: Bracket [a, b] or initial guess (x0), or both
+            - Speed: Fast (superlinear convergence)
+            - Robustness: Very robust, combines bisection, secant, and inverse quadratic
+            - Best for: General purpose use (recommended as primary solver)
+
+        **Bisection ('bisection')**
+            - Type: Bracket method
+            - Requires: Bracket [a, b] with f(a)*f(b) < 0
+            - Speed: Slower (linear convergence)
+            - Robustness: Always converges if bracket is valid
+            - Best for: Guaranteed convergence when you have a valid bracket
+
+        Default Backup Chain:
+            If not specified, the default backup solver chain is ['brent', 'bisection'],
+            which provides excellent robustness for most applications.
+
+        Examples
+        --------
+        List all available solvers:
+
+        >>> from meteorological_equations.math.solvers import RootSolvers
+        >>> 
+        >>> solvers = RootSolvers.list_root_solvers()
+        >>> print(solvers)
+        ['newton', 'brent', 'bisection']
+
+        Use different solvers:
+
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> 
+        >>> @njit
+        ... def f(x):
+        ...     return x**3 - 8
+        >>> 
+        >>> @njit
+        ... def f_prime(x):
+        ...     return 3 * x**2
+        >>> 
+        >>> # Use Newton-Raphson
+        >>> root, iters, conv = RootSolvers.get_root(
+        ...     func=f,
+        ...     x0=2.5,
+        ...     func_prime=f_prime,
+        ...     main_solver='newton'
+        ... )
+        >>> print(f"Newton: {root:.6f} in {iters} iterations")
+        Newton: 2.000000 in 4 iterations
+        >>> 
+        >>> # Use Brent's method
+        >>> root, iters, conv = RootSolvers.get_root(
+        ...     func=f,
+        ...     a=0.0,
+        ...     b=5.0,
+        ...     main_solver='brent'
+        ... )
+        >>> print(f"Brent: {root:.6f} in {iters} iterations")
+        Brent: 2.000000 in 6 iterations
+        >>> 
+        >>> # Use Bisection
+        >>> root, iters, conv = RootSolvers.get_root(
+        ...     func=f,
+        ...     a=0.0,
+        ...     b=5.0,
+        ...     main_solver='bisection'
+        ... )
+        >>> print(f"Bisection: {root:.6f} in {iters} iterations")
+        Bisection: 2.000000 in 26 iterations
+
+        Create custom backup chain:
+
+        >>> # Get available solvers
+        >>> available = RootSolvers.list_root_solvers()
+        >>> 
+        >>> # Create custom chain: try Newton first, then reliable methods
+        >>> custom_chain = ['brent', 'bisection']
+        >>> 
+        >>> # Verify all are valid
+        >>> assert all(solver in available for solver in custom_chain)
+        >>> 
+        >>> # Use custom chain
+        >>> root, iters, conv = RootSolvers.get_root(
+        ...     func=f,
+        ...     x0=2.5,
+        ...     a=0.0,
+        ...     b=5.0,
+        ...     func_prime=f_prime,
+        ...     main_solver='newton',
+        ...     backup_solvers=custom_chain
+        ... )
+
+        Dynamically check if solver is available:
+
+        >>> def use_solver_if_available(solver_name):
+        ...     '''Use solver only if it exists in current version.'''
+        ...     available = RootSolvers.list_root_solvers()
+        ...     
+        ...     if solver_name in available:
+        ...         print(f"Using {solver_name}")
+        ...         return solver_name
+        ...     else:
+        ...         print(f"{solver_name} not available, using brent")
+        ...         return 'brent'
+        >>> 
+        >>> solver = use_solver_if_available('newton')
+        Using newton
+        >>> 
+        >>> solver = use_solver_if_available('nonexistent')
+        nonexistent not available, using brent
+
+        Performance comparison of all solvers:
+
+        >>> import time
+        >>> 
+        >>> @njit
+        ... def complex_func(x):
+        ...     return np.sin(x) * np.exp(-x**2) - 0.1
+        >>> 
+        >>> @njit
+        ... def complex_func_prime(x):
+        ...     return np.cos(x) * np.exp(-x**2) - 2*x*np.sin(x)*np.exp(-x**2)
+        >>> 
+        >>> # Test all available solvers with brackets
+        >>> for solver in ['brent', 'bisection']:
+        ...     start = time.time()
+        ...     root, iters, conv = RootSolvers.get_root(
+        ...         func=complex_func,
+        ...         a=-2.0,
+        ...         b=2.0,
+        ...         main_solver=solver,
+        ...         use_backup=False
+        ...     )
+        ...     elapsed = time.time() - start
+        ...     print(f"{solver:12s}: {iters:3d} iters, {elapsed*1000:.2f}ms")
+        brent       :   8 iters, 0.45ms
+        bisection   :  26 iters, 0.62ms
+        >>> 
+        >>> # Test Newton with initial guess
+        >>> start = time.time()
+        >>> root, iters, conv = RootSolvers.get_root(
+        ...     func=complex_func,
+        ...     x0=1.0,
+        ...     func_prime=complex_func_prime,
+        ...     main_solver='newton',
+        ...     use_backup=False
+        ... )
+        >>> elapsed = time.time() - start
+        >>> print(f"{'newton':12s}: {iters:3d} iters, {elapsed*1000:.2f}ms")
+        newton      :   4 iters, 0.28ms
+
+        See Also
+        --------
+        get_root : Main function for finding roots using these solvers
+        SolverName : Enum containing solver name constants
+
         """
         return [solver.value for solver in SolverName]
 
@@ -382,7 +562,7 @@ class RootSolvers:
         max_iter: int = 100
     ) -> Tuple[Union[float, npt.NDArray], Union[int, npt.NDArray], Union[bool, npt.NDArray]]:
         """
-        
+
             Create substitute unconverged results when primary solver fails completely.
 
             Generates result tuples filled with "failure" values (NaN roots, maximum

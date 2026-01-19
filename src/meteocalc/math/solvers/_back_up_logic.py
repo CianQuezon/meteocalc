@@ -12,7 +12,7 @@ import numpy.typing as npt
 
 from meteorological_equations.math.solvers._enums import MethodType, SolverName
 from meteorological_equations.math.solvers._solvers import Solver
-from meteorological_equations.math.solvers.core import SolverMap
+from meteorological_equations.math.solvers._types_and_maps import SolverMap
 from meteorological_equations.shared._enum_tools import parse_enum
 
 
