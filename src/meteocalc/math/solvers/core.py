@@ -409,6 +409,10 @@ class RootSolvers:
         if backup_solvers is None:
             backup_solvers = [SolverName.BRENT, SolverName.BISECTION]
 
+        n_problems, _ = RootSolvers._get_problem_size(x0, a=a, b=b)
+
+        func_params = RootSolvers._standardise_func_params(func_params=func_params, n_problems=n_problems)
+
         solver_enum = parse_enum(main_solver, SolverName)
         solver = SolverMap[solver_enum]()
 
@@ -632,14 +636,59 @@ class RootSolvers:
         
         """
 
-        array_size = None
+        n_problems, is_scalar = RootSolvers._get_problem_size(x0=x0, a=a, b=b)
+        
+        if is_scalar:
+            return (np.nan, max_iter,False)
+        
+        else:
+            return(
+                np.full(n_problems, np.nan, dtype=np.float64),
+                np.full(n_problems, max_iter, dtype=np.int64),
+                np.full(n_problems, False, dtype=bool)
+            )
+        
+    @staticmethod
+    def _get_problem_size(
+        x0: Optional[Union[float, npt.ArrayLike]] = None,
+        a: Optional[Union[float, npt.ArrayLike]] = None,
+        b: Optional[Union[float, npt.ArrayLike]] = None,
+    ) -> Tuple[int, bool]:
+        """
+            Determine the number of problems from input arrays.
+            
+            Checks x0, then a, then b (in priority order) to determine how many
+            root-finding problems are being solved simultaneously.
+            
+            Parameters
+            ----------
+            x0 : float or array_like, optional
+                Initial guess(es). Takes priority over a and b.
+            a : float or array_like, optional
+                Lower bracket bound(s). Used if x0 is None.
+            b : float or array_like, optional
+                Upper bracket bound(s). Used if x0 and a are None.
+            
+            Returns
+            -------
+            n_problems : int
+                Number of problems. Returns 1 for scalar inputs, len(array) for
+                array inputs.
+            
+            Raises
+            ------
+            ValueError
+                If all inputs are None.
+        """
 
+        array_size = None
+        
         if x0 is not None:
-            array_size = np.asarray(x0) 
+           array_size = np.asarray(x0)        
         elif a is not None:
             array_size = np.asarray(a)
         elif b is not None:
-            array_size = np.asarray(b) 
+            array_size = np.asarray(b)
         
         if array_size is None:
             raise ValueError(
@@ -647,15 +696,49 @@ class RootSolvers:
                 "Must be provided to create a substitute results for backup solvers"
             )
         
-        if array_size.ndim == 0:
-            return (np.nan, max_iter,False)
-        
-        else:
-            n = len(array_size)
+        is_scalar = (array_size.ndim == 0)
 
-            return(
-                np.full(n, np.nan, dtype=np.float64),
-                np.full(n, max_iter, dtype=np.int64),
-                np.full(n, False, dtype=bool)
-            )
+        if is_scalar:
+            return 1, True
+        else:
+            return len(array_size), False
         
+    @staticmethod
+    def _standardise_func_params(
+        func_params: Optional[npt.ArrayLike],
+        n_problems: int
+    ) -> Optional[npt.NDArray]:
+        """
+        Standardize func_params to 2D array format.
+        
+        Parameters
+        ----------
+        func_params : array_like or None
+            Function parameters to standardize.
+        n_problems : int
+            Number of problems (from _determine_problem_size).
+        
+        Returns
+        -------
+        func_params_2d : ndarray or None
+            Standardized parameters as (n_problems, n_params) array.
+        """
+
+        if func_params is None:
+            return None
+        
+        func_params = np.asarray(func_params)
+
+        if func_params.ndim == 0:
+            return np.full((n_problems, 1), func_params, dtype=np.float64)
+        elif func_params.ndim == 1:
+            return np.tile(func_params, (n_problems, 1))
+        elif func_params.ndim == 2:
+            if func_params.shape[0] != n_problems:
+                raise ValueError(
+                    f"func_params has {func_params.shape[0]} rows but expected "
+                    f"{n_problems} rows"
+                )
+            return func_params
+        else:
+            raise ValueError(f"func_params must be 0D, 1D, or 2D, got {func_params.ndim}D")
