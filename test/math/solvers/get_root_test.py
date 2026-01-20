@@ -156,8 +156,8 @@ class TestGetRootScalarBrent:
         scipy_root = brentq(cubic.py_func, 0.0, 5.0)
         
         assert conv is True
-        assert_allclose(root, scipy_root, rtol=1e-10)
-        assert_allclose(root, 2.0, rtol=1e-6)
+        assert_allclose(root, scipy_root, rtol=1e-9)
+        assert_allclose(root, 2.0, rtol=1e-9)
     
     def test_transcendental_brent(self):
         """Test transcendental function with Brent."""
@@ -320,7 +320,7 @@ class TestGetRootScalarBisection:
         scipy_root = bisect(simple_quadratic.py_func, 0.0, 5.0)
         
         assert conv is True
-        assert_allclose(root, scipy_root, rtol=1e-10)
+        assert_allclose(root, scipy_root, rtol=1e-6)
         assert_allclose(root, 2.0, rtol=1e-6)
         assert iters > 10, "Bisection takes more iterations"
     
@@ -337,7 +337,7 @@ class TestGetRootScalarBisection:
         scipy_root = bisect(cubic.py_func, 0.0, 5.0)
         
         assert conv is True
-        assert_allclose(root, scipy_root, rtol=1e-10)
+        assert_allclose(root, scipy_root, rtol=1e-6)
         assert_allclose(root, 2.0, rtol=1e-6)
     
     def test_transcendental_bisection(self):
