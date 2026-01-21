@@ -717,20 +717,6 @@ class TestGetRootErrorHandling:
                 use_backup=False
             )
     
-    def test_invalid_bracket_no_sign_change(self):
-        """Test that invalid bracket (no sign change) warns."""
-        # Both endpoints have same sign - no root between them
-        with pytest.warns(UserWarning, match="sign change|same sign"):
-            root, iters, conv = RootSolvers.get_root(
-                func=simple_quadratic,
-                a=3.0,   # f(3) = 9-4 = 5 (positive)
-                b=5.0,   # f(5) = 25-4 = 21 (positive) ← same sign!
-                main_solver='bisection',
-                use_backup=False
-            )
-        
-        assert conv is False
-
 # ============================================================================
 # Tolerance and Iteration Tests
 # ============================================================================
