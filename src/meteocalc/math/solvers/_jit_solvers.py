@@ -24,18 +24,61 @@ def _newton_raphson_scalar(
     *func_params,
 ) -> Tuple[float, int, bool]:
     """
-    Newton raphson for root finding.
-
-    Args:
-        func(Callable[[float], float]) = Function of the root required to solve
-        func_prime(Callable[[float], float]) = Derivative of the function
-        x0(float) = Initial guess
-        tol(float) = Tolerance for convergence
-        max_iter(int) = Maximum iterations
-        func_params = function parameters of the function
-
-    Returns:
-        (root, iterations, converged)
+    Scalar Newton-Raphson method for finding roots of a function.
+    
+    This is the core JIT-compiled implementation of Newton's method for a
+    single root-finding problem. It uses the tangent line approximation
+    to iteratively refine an initial guess until convergence or failure.
+    
+    The method computes: x_{n+1} = x_n - f(x_n) / f'(x_n)
+    
+    This function is designed to be called by vectorised solvers and should
+    generally not be called directly by users.
+    
+    Parameters
+    ----------
+    func : callable
+        Function for which to find the root. Must be JIT-compiled and have
+        signature: func(x, *params) -> float, where x is the independent
+        variable and params are optional additional parameters.
+    func_prime : callable
+        Derivative of func. Must be JIT-compiled and have the same signature
+        as func: func_prime(x, *params) -> float.
+    x0 : float
+        Initial guess for the root location. The quality of this guess
+        significantly affects convergence. Should be reasonably close to
+        the actual root for best results.
+    tol : float, default=1e-6
+        Convergence tolerance. The algorithm stops when the absolute change
+        in x between iterations is less than tol: |x_{n+1} - x_n| < tol.
+    max_iter : int, default=50
+        Maximum number of iterations allowed. If convergence is not achieved
+        within this limit, the function returns with converged=False.
+    *func_params : tuple
+        Variable-length tuple of additional parameters to pass to func and
+        func_prime. These are unpacked and passed as: func(x, *func_params).
+    
+    Returns
+    -------
+    root : float
+        Estimated root location. If converged=True, this satisfies the
+        convergence criterion. If converged=False, this is the best estimate
+        after max_iter iterations or when derivative becomes too small.
+    iterations : int
+        Number of iterations performed. Range: [0, max_iter].
+        - If converged=True: actual iterations to convergence
+        - If converged=False: max_iter (or iteration where derivative failed)
+    converged : bool
+        Convergence flag indicating whether the solution met the tolerance
+        criterion within max_iter iterations.
+        - True: |x_{n+1} - x_n| < tol (successful convergence)
+        - False: max_iter reached or derivative too small (|f'(x)| < 1e-15)
+    
+    See Also
+    --------
+    _newton_raphson_vectorised : Vectorised version for solving multiple problems
+    _bisection_scalar : Bracket-based alternative (no derivative needed)
+    _brent_scalar : Robust bracket-based method (recommended for most cases)
     """
     x = x0
 
@@ -65,18 +108,77 @@ def _newton_raphson_vectorised(
     max_iter: int = 50,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
     """
-    Vectorised version for Newton Raphson solver
-
-    Args:
-        - func(Callable[[float], float]) = function required to solve the root
-        - func_prime(Callable[[float], float]) = derivative of the function
-        - func_params(npt.ArrayLike) = an array of function parameters
-        - x0(npt.ArrayLike) = Array of initial guesses
-        - tol (float) = Convergence tolerance
-        - max_iter(int) = maximum amount of iterations
-
-    Returns:
-        Array of (root, iterations, converged)
+    Vectorised Newton-Raphson method for solving multiple root-finding problems.
+    
+    This function solves multiple independent root-finding problems in parallel
+    using Newton's method. Each problem can have different initial guesses and
+    different function parameters, enabling efficient batch solving of related
+    problems (e.g., finding equilibrium conditions at multiple meteorological
+    stations).
+    
+    The vectorisation is achieved through Numba's prange for automatic
+    parallelization across CPU cores, with runtime code generation handling
+    variable numbers of function parameters.
+    
+    Parameters
+    ----------
+    func : callable
+        Function for which to find roots. Must be JIT-compiled (@njit) and
+        have signature: func(x, *params) -> float, where x is the independent
+        variable and params are optional additional parameters.
+        
+        The same function is used for all problems, but parameters can vary
+        per problem via func_params.
+    func_prime : callable
+        Derivative of func with respect to x. Must be JIT-compiled (@njit)
+        and have the same signature as func: func_prime(x, *params) -> float.
+        
+        Accurate derivatives are critical for Newton's method convergence.
+    x0 : array_like, shape (n_solves,)
+        Array of initial guesses, one per problem. Each problem uses its
+        corresponding initial guess for Newton iteration.
+        
+        Quality of initial guesses significantly affects convergence rate
+        and reliability. Poor guesses may cause divergence or slow convergence.
+    func_params : array_like or None, optional
+        Function parameters for each problem. Can be:
+        
+        - None: No parameters (func and func_prime take only x)
+        - 1D array, shape (n_params,): Same parameters for ALL problems
+          (broadcast to all)
+        - 2D array, shape (n_solves, n_params): Different parameters per problem
+        
+        Default is None.
+    tol : float, default=1e-6
+        Convergence tolerance for all problems. Each problem stops when
+        |x_{n+1} - x_n| < tol.
+    max_iter : int, default=50
+        Maximum iterations allowed per problem. Problems that don't converge
+        within this limit return with converged=False.
+    
+    Returns
+    -------
+    roots : ndarray, shape (n_solves,), dtype=float64
+        Array of root locations, one per problem. For converged problems,
+        these satisfy the tolerance criterion. For unconverged problems,
+        these are the best estimates after max_iter iterations.
+    iterations : ndarray, shape (n_solves,), dtype=int64
+        Number of iterations performed for each problem. Range: [0, max_iter].
+        Lower values indicate faster convergence (or early failure).
+    converged : ndarray, shape (n_solves,), dtype=bool
+        Convergence flags for each problem:
+        
+        - True: Problem converged (|x_{n+1} - x_n| < tol)
+        - False: Problem failed (max_iter reached or derivative too small)
+    
+    See Also
+    --------
+    _newton_raphson_scalar : Scalar version for single problem
+    _bisection_vectorised : Vectorised bracket method (no derivative needed)
+    _brent_vectorised : Vectorised robust bracket method (recommended alternative)
+    generate_vectorised_solver : Code generator used internally
+    _validate_and_prepare_params : Parameter validation and preparation
+    
     """
     x0 = np.asarray(x0, dtype=np.float64)
     n_solves = len(x0)
