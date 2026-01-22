@@ -1,5 +1,5 @@
 """
-Shared types and maps for solvers.
+Shared types and maps for solvers to avoid circular import errors.
 
 Author: Cian Quezon
 """
