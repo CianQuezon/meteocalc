@@ -44,16 +44,16 @@ OpenRootMethodVectorised = Callable[
 class Solver(ABC):
     """
     Abstract base class for all root-finding solvers.
-    
+
     This class defines the common interface and shared functionality for all
     solver implementations. It provides automatic dispatching between scalar
     and vectorised execution paths, shape preservation for multi-dimensional
     inputs, and parameter preparation utilities.
-    
+
     Concrete solver classes (NewtonRaphsonSolver, BisectionSolver, BrentSolver)
     inherit from this base and implement the `find_root` method with their
     specific algorithm requirements.
-    
+
     Attributes
     ----------
     method_type : MethodType
@@ -62,7 +62,7 @@ class Solver(ABC):
     name : SolverName
         Unique identifier for the solver algorithm (NEWTON, BRENT, BISECTION).
         Set by concrete subclasses in __init__.
-    
+
     See Also
     --------
     NewtonRaphsonSolver : Newton-Raphson method implementation
@@ -76,11 +76,11 @@ class Solver(ABC):
     def get_method_type(self) -> str:
         """
         Get the method type classification of this solver.
-        
+
         Returns the MethodType enum indicating whether this is an open method
         (requires initial guess), bracket method (requires interval bounds),
         hybrid method (combines both approaches), or custom method.
-        
+
         Returns
         -------
         MethodType
@@ -89,7 +89,7 @@ class Solver(ABC):
             - MethodType.BRACKET: Bisection, Regula Falsi
             - MethodType.HYBRID: Brent (uses both bracketing and interpolation)
             - MethodType.CUSTOM: User-defined methods
-        
+
         See Also
         --------
         MethodType : Enumeration of solver method categories
@@ -102,12 +102,12 @@ class Solver(ABC):
     ) -> Tuple[float, ...]:
         """
         Prepare function parameters for scalar solver execution.
-        
+
         Converts various parameter input formats into a tuple that can be
         unpacked with the * operator for passing to JIT-compiled scalar
         functions. This ensures compatibility with Numba's requirement for
         explicit parameter passing.
-        
+
         Parameters
         ----------
         func_params : tuple, array_like, or None
@@ -116,13 +116,13 @@ class Solver(ABC):
             - tuple: Already in correct format (returns as-is)
             - list or ndarray: Converted to flattened tuple
             - scalar: Wrapped in single-element tuple
-        
+
         Returns
         -------
         tuple of float
             Parameters as tuple ready for unpacking with * operator.
             Empty tuple () if func_params is None.
-        
+
         See Also
         --------
         _dispatch_root_bracket_method : Uses this for parameter preparation
@@ -157,14 +157,14 @@ class Solver(ABC):
     ]:
         """
         Dispatch bracket methods to scalar or vectorised implementations.
-        
+
         This internal dispatcher automatically selects between scalar and
         vectorised execution paths based on input types, handles multi-dimensional
         array shapes, and ensures consistent output formatting.
-        
+
         Used by bracket-based solvers (Bisection, Brent) to provide a unified
         interface regardless of input type.
-        
+
         Parameters
         ----------
         func : callable
@@ -184,7 +184,7 @@ class Solver(ABC):
             Convergence tolerance.
         max_iter : int, default=50
             Maximum iterations per problem.
-        
+
         Returns
         -------
         scalar case (a is 0D scalar):
@@ -194,7 +194,7 @@ class Solver(ABC):
                 Number of iterations performed
             converged : bool
                 Convergence flag
-        
+
         vectorised case (a is array):
             roots : ndarray, same shape as input `a`
                 Root locations
@@ -256,12 +256,12 @@ class Solver(ABC):
     ]:
         """
         Dispatch open methods to scalar or vectorised implementations.
-        
+
         This internal dispatcher automatically selects between scalar and
         vectorised execution paths for open methods (Newton-Raphson, Secant),
         handles multi-dimensional array shapes, and manages optional derivative
         functions.
-        
+
         Parameters
         ----------
         func : callable
@@ -281,7 +281,7 @@ class Solver(ABC):
             Convergence tolerance.
         max_iter : int, default=100
             Maximum iterations per problem.
-        
+
         Returns
         -------
         scalar case (x0 is 0D scalar):
@@ -291,7 +291,7 @@ class Solver(ABC):
                 Number of iterations performed
             converged : bool
                 Convergence flag
-        
+
         vectorised case (x0 is array):
             roots : ndarray, same shape as input `x0`
                 Root locations
@@ -346,38 +346,16 @@ class Solver(ABC):
     def find_root(self, *args, **kwargs):
         """
         Find roots of a function (abstract method).
-        
+
         This method must be implemented by all concrete solver subclasses.
         The specific signature and requirements depend on the solver type
         (open vs bracket methods).
-        
+
         Raises
         ------
         NotImplementedError
             If called on the base Solver class directly.
-        
-        See Also
-        --------
-        NewtonRaphsonSolver.find_root : Open method implementation
-        BisectionSolver.find_root : Bracket method implementation
-        BrentSolver.find_root : Hybrid method implementation
-        """
-        pass
 
-
-class NewtonRaphsonSolver(Solver):
-        """
-        Find roots of a function (abstract method).
-        
-        This method must be implemented by all concrete solver subclasses.
-        The specific signature and requirements depend on the solver type
-        (open vs bracket methods).
-        
-        Raises
-        ------
-        NotImplementedError
-            If called on the base Solver class directly.
-        
         See Also
         --------
         NewtonRaphsonSolver.find_root : Open method implementation
@@ -390,44 +368,44 @@ class NewtonRaphsonSolver(Solver):
 class NewtonRaphsonSolver(Solver):
     """
     Newton-Raphson method solver for root finding.
-    
+
     Implements Newton's method, which uses the function and its derivative
     to iteratively refine an initial guess. Provides fast quadratic convergence
     when the initial guess is good and the function is well-behaved.
-    
+
     The solver automatically dispatches between scalar and vectorised execution
     based on input types, supporting both single and batch root-finding problems.
-    
+
     Attributes
     ----------
     name : SolverName
         Set to SolverName.NEWTON
     method_type : MethodType
         Set to MethodType.OPEN
-    
+
     Examples
     --------
     Scalar root finding:
-    
+
     >>> from numba import njit
-    >>> 
+    >>>
     >>> @njit
     ... def func(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> @njit
     ... def func_prime(x):
     ...     return 2*x
-    >>> 
+    >>>
     >>> solver = NewtonRaphsonSolver()
     >>> root, iters, conv = solver.find_root(
     ...     func, func_prime, x0=1.0, tol=1e-6, max_iter=50
     ... )
     >>> print(f"Root: {root:.6f}, Iterations: {iters}")
     Root: 2.000000, Iterations: 4
-    
+
     Vectorised root finding:
-    
+
     >>> import numpy as np
     >>> x0 = np.array([1.0, 1.5, 0.5])
     >>> roots, iters, conv = solver.find_root(
@@ -437,17 +415,17 @@ class NewtonRaphsonSolver(Solver):
     Roots: [2.0, 2.0, 2.0]
     >>> print("Iterations:", iters)
     Iterations: [4, 3, 5]
-    
+
     With function parameters:
-    
+
     >>> @njit
     ... def parametric_func(x, a, b):
     ...     return a * x**2 + b
-    >>> 
+    >>>
     >>> @njit
     ... def parametric_prime(x, a, b):
     ...     return 2 * a * x
-    >>> 
+    >>>
     >>> # Different parameters per problem
     >>> func_params = np.array([[1.0, -4.0], [2.0, -8.0]])
     >>> roots, iters, conv = solver.find_root(
@@ -455,7 +433,7 @@ class NewtonRaphsonSolver(Solver):
     ...     x0=np.array([1.0, 1.0]),
     ...     func_params=func_params
     ... )
-    
+
     See Also
     --------
     BrentSolver : More robust alternative (no derivative needed)
@@ -485,13 +463,13 @@ class NewtonRaphsonSolver(Solver):
     ]:
         """
         Find roots using Newton-Raphson method.
-        
+
         Iteratively refines an initial guess using Newton's formula:
         x_{n+1} = x_n - f(x_n) / f'(x_n)
-        
+
         Automatically dispatches to scalar or vectorised implementation based
         on x0 type. Supports multi-dimensional arrays with shape preservation.
-        
+
         Parameters
         ----------
         func : callable
@@ -515,7 +493,7 @@ class NewtonRaphsonSolver(Solver):
         max_iter : int, default=50
             Maximum iterations allowed per problem. Newton typically
             converges in 3-8 iterations with good x0.
-        
+
         Returns
         -------
         scalar case (x0 is scalar):
@@ -525,7 +503,7 @@ class NewtonRaphsonSolver(Solver):
                 Number of iterations performed [0, max_iter]
             converged : bool
                 True if tolerance met, False if failed
-        
+
         vectorised case (x0 is array):
             roots : ndarray, same shape as x0
                 Root locations for each problem
@@ -533,20 +511,20 @@ class NewtonRaphsonSolver(Solver):
                 Iteration counts per problem
             converged : ndarray, same shape as x0
                 Convergence flags per problem
-        
+
         Raises
         ------
         TypeError
             If func or func_prime are not callable
         ValueError
             If x0, func_params shapes incompatible
-        
+
         See Also
         --------
         BrentSolver.find_root : Alternative without derivative
         _newton_raphson_scalar : Scalar implementation details
         _newton_raphson_vectorised : Vectorised implementation details
-        
+
         Examples
         --------
         See class docstring for comprehensive examples.
@@ -566,41 +544,41 @@ class NewtonRaphsonSolver(Solver):
 class BisectionSolver(Solver):
     """
     Bisection method solver for root finding.
-    
+
     Implements the bisection algorithm, which repeatedly halves an interval
     where the function changes sign. Provides guaranteed linear convergence
     for continuous functions with valid brackets.
-    
+
     The solver is the most robust root-finding method but slower than
     Newton or Brent. It automatically dispatches between scalar and vectorised
     execution based on input types.
-    
+
     Attributes
     ----------
     name : SolverName
         Set to SolverName.BISECTION
     method_type : MethodType
         Set to MethodType.BRACKET
-    
+
     Examples
     --------
     Scalar root finding:
-    
+
     >>> from numba import njit
-    >>> 
+    >>>
     >>> @njit
     ... def func(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> solver = BisectionSolver()
     >>> root, iters, conv = solver.find_root(
     ...     func, a=0.0, b=5.0, tol=1e-6, max_iter=100
     ... )
     >>> print(f"Root: {root:.6f}, Iterations: {iters}")
     Root: 2.000000, Iterations: 23
-    
+
     Vectorised root finding:
-    
+
     >>> import numpy as np
     >>> a = np.array([0.0, -5.0, 1.0])
     >>> b = np.array([5.0, 0.0, 3.0])
@@ -609,16 +587,16 @@ class BisectionSolver(Solver):
     ... )
     >>> print("Roots:", roots)
     Roots: [2.0, -2.0, 2.0]
-    
+
     Invalid bracket (no sign change):
-    
+
     >>> # Both endpoints positive - returns NaN
     >>> root, iters, conv = solver.find_root(
     ...     func, a=3.0, b=5.0
     ... )
     >>> print(f"Converged: {conv}, Root: {root}")
     Converged: False, Root: nan
-    
+
     See Also
     --------
     BrentSolver : Faster alternative with same robustness (recommended)
@@ -626,6 +604,7 @@ class BisectionSolver(Solver):
     _bisection_scalar : Underlying scalar implementation
     _bisection_vectorised : Underlying vectorised implementation
     """
+
     def __init__(self):
         self.name = SolverName.BISECTION
         self.method_type = MethodType.BRACKET
@@ -644,13 +623,13 @@ class BisectionSolver(Solver):
     ]:
         """
         Find roots using bisection method.
-        
+
         Repeatedly halves the interval [a, b] where f(a) and f(b) have
         opposite signs until convergence or max_iter reached.
-        
+
         Automatically dispatches to scalar or vectorised implementation.
         Supports multi-dimensional arrays with shape preservation.
-        
+
         Parameters
         ----------
         func : callable
@@ -670,7 +649,7 @@ class BisectionSolver(Solver):
         max_iter : int, default=100
             Maximum iterations allowed per problem. Bisection typically
             needs ≈ log₂((b-a)/tol) iterations ≈ 20-25.
-        
+
         Returns
         -------
         scalar case (a is scalar):
@@ -680,7 +659,7 @@ class BisectionSolver(Solver):
                 Number of iterations [0, max_iter]
             converged : bool
                 True if converged, False if invalid bracket or max_iter
-        
+
         vectorised case (a is array):
             roots : ndarray, same shape as a
                 Root locations (NaN for invalid brackets)
@@ -688,18 +667,18 @@ class BisectionSolver(Solver):
                 Iteration counts per problem
             converged : ndarray, same shape as a
                 Convergence flags per problem
-        
+
         Warnings
         --------
         Returns (np.nan, 0, False) for brackets without sign change.
         Each bracket must satisfy f(a) * f(b) < 0.
-        
+
         See Also
         --------
         BrentSolver.find_root : Faster with same robustness
         _bisection_scalar : Scalar implementation details
         _bisection_vectorised : Vectorised implementation details
-        
+
         Examples
         --------
         See class docstring for comprehensive examples.
@@ -720,43 +699,43 @@ class BisectionSolver(Solver):
 class BrentSolver(Solver):
     """
     Brent's method solver for root finding.
-    
+
     Implements Brent's algorithm, combining the robustness of bisection with
     the speed of inverse quadratic interpolation and secant methods. This is
     the RECOMMENDED general-purpose bracketing solver - faster than bisection
     with the same convergence guarantee.
-    
+
     The solver adaptively chooses the best strategy at each iteration and
     automatically dispatches between scalar and vectorised execution.
-    
+
     Attributes
     ----------
     name : SolverName
         Set to SolverName.BRENT
     method_type : MethodType
         Set to MethodType.HYBRID (uses both bracketing and interpolation)
-    
+
     Examples
     --------
     Scalar root finding:
-    
+
     >>> from numba import njit
-    >>> 
+    >>>
     >>> @njit
     ... def func(x):
     ...     return x**2 - 4
-    >>> 
+    >>>
     >>> solver = BrentSolver()
     >>> root, iters, conv = solver.find_root(
     ...     func, a=0.0, b=5.0, tol=1e-6, max_iter=100
     ... )
     >>> print(f"Root: {root:.6f}, Iterations: {iters}")
     Root: 2.000000, Iterations: 6
-    >>> 
+    >>>
     >>> # Compare: Bisection needs ~23 iterations for same problem
-    
+
     Vectorised root finding:
-    
+
     >>> import numpy as np
     >>> a = np.array([0.0, -5.0, 1.0])
     >>> b = np.array([5.0, 0.0, 3.0])
@@ -767,13 +746,13 @@ class BrentSolver(Solver):
     Roots: [2.0, -2.0, 2.0]
     >>> print("Iterations:", iters)
     Iterations: [6, 6, 5]
-    
+
     Transcendental function (where Brent excels):
-    
+
     >>> @njit
     ... def transcendental(x):
     ...     return np.exp(x) - 2
-    >>> 
+    >>>
     >>> root, iters, conv = solver.find_root(
     ...     transcendental, a=0.0, b=2.0, tol=1e-10
     ... )
@@ -782,7 +761,7 @@ class BrentSolver(Solver):
     >>> print(f"Iterations: {iters}")
     Iterations: 8
     >>> # Bisection would need ~34 iterations for tol=1e-10
-    
+
     See Also
     --------
     BisectionSolver : Simpler but slower (3-4x)
@@ -790,6 +769,7 @@ class BrentSolver(Solver):
     _brent_scalar : Underlying scalar implementation
     _brent_vectorised : Underlying vectorised implementation
     """
+
     def __init__(self):
         self.name = SolverName.BRENT
         self.method_type = MethodType.HYBRID
@@ -808,13 +788,13 @@ class BrentSolver(Solver):
     ]:
         """
         Find roots using Brent's method.
-        
+
         Adaptively combines inverse quadratic interpolation, secant method,
         and bisection for fast, robust root finding.
-        
+
         Automatically dispatches to scalar or vectorised implementation.
         Supports multi-dimensional arrays with shape preservation.
-        
+
         Parameters
         ----------
         func : callable
@@ -833,7 +813,7 @@ class BrentSolver(Solver):
         max_iter : int, default=100
             Maximum iterations allowed per problem. Brent typically
             converges in 5-15 iterations (much faster than bisection).
-        
+
         Returns
         -------
         scalar case (a is scalar):
@@ -843,7 +823,7 @@ class BrentSolver(Solver):
                 Number of iterations [0, max_iter]
             converged : bool
                 True if converged, False if invalid bracket
-        
+
         vectorised case (a is array):
             roots : ndarray, same shape as a
                 Root locations (NaN for invalid brackets)
@@ -851,18 +831,18 @@ class BrentSolver(Solver):
                 Iteration counts per problem
             converged : ndarray, same shape as a
                 Convergence flags per problem
-        
+
         Warnings
         --------
         Returns (np.nan, 0, False) for brackets without sign change.
         Each bracket must satisfy f(a) * f(b) < 0.
-        
+
         See Also
         --------
         BisectionSolver.find_root : Simpler but slower alternative
         _brent_scalar : Scalar implementation details
         _brent_vectorised : Vectorised implementation details
-        
+
         Examples
         --------
         See class docstring for comprehensive examples.

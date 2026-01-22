@@ -25,16 +25,16 @@ def _newton_raphson_scalar(
 ) -> Tuple[float, int, bool]:
     """
     Scalar Newton-Raphson method for finding roots of a function.
-    
+
     This is the core JIT-compiled implementation of Newton's method for a
     single root-finding problem. It uses the tangent line approximation
     to iteratively refine an initial guess until convergence or failure.
-    
+
     The method computes: x_{n+1} = x_n - f(x_n) / f'(x_n)
-    
+
     This function is designed to be called by vectorised solvers and should
     generally not be called directly by users.
-    
+
     Parameters
     ----------
     func : callable
@@ -57,7 +57,7 @@ def _newton_raphson_scalar(
     *func_params : tuple
         Variable-length tuple of additional parameters to pass to func and
         func_prime. These are unpacked and passed as: func(x, *func_params).
-    
+
     Returns
     -------
     root : float
@@ -73,7 +73,7 @@ def _newton_raphson_scalar(
         criterion within max_iter iterations.
         - True: |x_{n+1} - x_n| < tol (successful convergence)
         - False: max_iter reached or derivative too small (|f'(x)| < 1e-15)
-    
+
     See Also
     --------
     _newton_raphson_vectorised : Vectorised version for solving multiple problems
@@ -109,45 +109,45 @@ def _newton_raphson_vectorised(
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
     """
     Vectorised Newton-Raphson method for solving multiple root-finding problems.
-    
+
     This function solves multiple independent root-finding problems in parallel
     using Newton's method. Each problem can have different initial guesses and
     different function parameters, enabling efficient batch solving of related
     problems (e.g., finding equilibrium conditions at multiple meteorological
     stations).
-    
+
     The vectorisation is achieved through Numba's prange for automatic
     parallelization across CPU cores, with runtime code generation handling
     variable numbers of function parameters.
-    
+
     Parameters
     ----------
     func : callable
         Function for which to find roots. Must be JIT-compiled (@njit) and
         have signature: func(x, *params) -> float, where x is the independent
         variable and params are optional additional parameters.
-        
+
         The same function is used for all problems, but parameters can vary
         per problem via func_params.
     func_prime : callable
         Derivative of func with respect to x. Must be JIT-compiled (@njit)
         and have the same signature as func: func_prime(x, *params) -> float.
-        
+
         Accurate derivatives are critical for Newton's method convergence.
     x0 : array_like, shape (n_solves,)
         Array of initial guesses, one per problem. Each problem uses its
         corresponding initial guess for Newton iteration.
-        
+
         Quality of initial guesses significantly affects convergence rate
         and reliability. Poor guesses may cause divergence or slow convergence.
     func_params : array_like or None, optional
         Function parameters for each problem. Can be:
-        
+
         - None: No parameters (func and func_prime take only x)
         - 1D array, shape (n_params,): Same parameters for ALL problems
           (broadcast to all)
         - 2D array, shape (n_solves, n_params): Different parameters per problem
-        
+
         Default is None.
     tol : float, default=1e-6
         Convergence tolerance for all problems. Each problem stops when
@@ -155,7 +155,7 @@ def _newton_raphson_vectorised(
     max_iter : int, default=50
         Maximum iterations allowed per problem. Problems that don't converge
         within this limit return with converged=False.
-    
+
     Returns
     -------
     roots : ndarray, shape (n_solves,), dtype=float64
@@ -167,10 +167,10 @@ def _newton_raphson_vectorised(
         Lower values indicate faster convergence (or early failure).
     converged : ndarray, shape (n_solves,), dtype=bool
         Convergence flags for each problem:
-        
+
         - True: Problem converged (|x_{n+1} - x_n| < tol)
         - False: Problem failed (max_iter reached or derivative too small)
-    
+
     See Also
     --------
     _newton_raphson_scalar : Scalar version for single problem
@@ -178,7 +178,7 @@ def _newton_raphson_vectorised(
     _brent_vectorised : Vectorised robust bracket method (recommended alternative)
     generate_vectorised_solver : Code generator used internally
     _validate_and_prepare_params : Parameter validation and preparation
-    
+
     """
     x0 = np.asarray(x0, dtype=np.float64)
     n_solves = len(x0)
@@ -205,18 +205,18 @@ def _bisection_scalar(
 ) -> Tuple[float, int, bool]:
     """
     Scalar bisection method for finding roots of a function.
-    
+
     This is the core JIT-compiled implementation of the bisection method for a
     single root-finding problem. It repeatedly halves an interval [a, b] where
     the function changes sign, guaranteeing convergence for continuous functions.
-    
+
     The method is the most robust root-finding algorithm but has slower (linear)
     convergence compared to Newton or Brent methods. It requires a bracket where
     f(a) and f(b) have opposite signs.
-    
+
     This function is designed to be called by vectorised solvers and should
     generally not be called directly by users.
-    
+
     Parameters
     ----------
     func : callable
@@ -233,7 +233,7 @@ def _bisection_scalar(
         Convergence tolerance. The algorithm stops when either:
         - |f(c)| < tol (function value small enough), or
         - |b - a|/2 < tol (bracket width small enough)
-        
+
         where c is the midpoint of the current bracket.
     max_iter : int, default=100
         Maximum number of iterations allowed. If convergence is not achieved
@@ -242,7 +242,7 @@ def _bisection_scalar(
     *func_params : tuple
         Variable-length tuple of additional parameters to pass to func.
         These are unpacked and passed as: func(x, *func_params).
-    
+
     Returns
     -------
     root : float
@@ -259,7 +259,7 @@ def _bisection_scalar(
         Convergence flag indicating success or failure.
         - True: Tolerance criterion met (|f(c)| < tol or |b-a|/2 < tol)
         - False: Invalid bracket (f(a)*f(b) > 0) or max_iter reached
-    
+
     See Also
     --------
     _bisection_vectorised : Vectorised version for solving multiple problems
@@ -307,24 +307,24 @@ def _bisection_vectorised(
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
     """
     Vectorised bisection method for solving multiple root-finding problems.
-    
+
     This function solves multiple independent root-finding problems in parallel
     using the bisection method. Each problem can have different brackets and
     different function parameters, enabling efficient batch solving of bracketed
     problems (e.g., finding equilibrium altitudes at multiple meteorological
     stations where approximate bounds are known).
-    
+
     The vectorisation uses Numba's prange for automatic parallelization across
     CPU cores, with runtime code generation handling variable numbers of
     function parameters.
-    
+
     Parameters
     ----------
     func : callable
         Function for which to find roots. Must be JIT-compiled (@njit) and
         have signature: func(x, *params) -> float, where x is the independent
         variable and params are optional additional parameters.
-        
+
         The same function is used for all problems, but parameters can vary
         per problem via func_params.
     a : array_like, shape (n_solves,)
@@ -335,12 +335,12 @@ def _bisection_vectorised(
         f(a[i]) * f(b[i]) < 0 for a valid bracket.
     func_params : array_like or None, optional
         Function parameters for each problem. Can be:
-        
+
         - None: No parameters (func takes only x)
         - 1D array, shape (n_params,): Same parameters for ALL problems
           (broadcast to all)
         - 2D array, shape (n_solves, n_params): Different parameters per problem
-        
+
         Default is None.
     tol : float, default=1e-6
         Convergence tolerance for all problems. Each problem stops when
@@ -348,7 +348,7 @@ def _bisection_vectorised(
     max_iter : int, default=100
         Maximum iterations allowed per problem. Bisection typically needs
         ~log₂((b-a)/tol) iterations, so 100 is sufficient for most cases.
-    
+
     Returns
     -------
     roots : ndarray, shape (n_solves,), dtype=float64
@@ -361,7 +361,7 @@ def _bisection_vectorised(
         Typically ~log₂((b-a)/tol) iterations for valid brackets.
     converged : ndarray, shape (n_solves,), dtype=bool
         Convergence flags for each problem:
-        
+
         - True: Problem converged (tolerance met)
         - False: Invalid bracket (f(a)*f(b) > 0) or max_iter reached
 
@@ -398,20 +398,20 @@ def _brent_scalar(
 ) -> Tuple[float, int, bool]:
     """
     Scalar Brent's method for finding roots of a function.
-    
+
     This is the core JIT-compiled implementation of Brent's method, combining
     the robustness of bisection with the speed of inverse quadratic interpolation
     and the secant method. Brent's method is widely considered the best
     general-purpose root-finding algorithm for bracketed problems.
-    
+
     The algorithm adaptively chooses between three techniques at each iteration:
     1. Inverse quadratic interpolation (fastest, when three distinct points available)
     2. Secant method (fast, linear interpolation between two points)
     3. Bisection (robust fallback when interpolation is unreliable)
-    
+
     This function is designed to be called by vectorised solvers and should
     generally not be called directly by users.
-    
+
     Parameters
     ----------
     func : callable
@@ -424,14 +424,14 @@ def _brent_scalar(
     b : float
         Upper bound of the bracket. Must satisfy f(a) * f(b) < 0 for a valid
         bracket (i.e., function must have opposite signs at a and b).
-        
+
         Note: Brent's algorithm maintains b as the best current estimate,
         so input order of a and b doesn't matter (algorithm reorients).
     tol : float, default=1e-6
         Convergence tolerance. The algorithm stops when either:
         - |f(b)| < tol (function value small enough), or
         - |b - a| < tol (bracket width small enough)
-        
+
         where b is the current best estimate.
     max_iter : int, default=100
         Maximum number of iterations allowed. Brent's method typically
@@ -440,7 +440,7 @@ def _brent_scalar(
     *func_params : tuple
         Variable-length tuple of additional parameters to pass to func.
         These are unpacked and passed as: func(x, *func_params).
-    
+
     Returns
     -------
     root : float
@@ -457,7 +457,7 @@ def _brent_scalar(
         Convergence flag indicating success or failure.
         - True: Tolerance criterion met (|f(b)| < tol or |b-a| < tol)
         - False: Invalid bracket (f(a)*f(b) > 0) or max_iter reached
-    
+
     See Also
     --------
     _brent_vectorised : Vectorised version for solving multiple problems
@@ -543,28 +543,28 @@ def _brent_vectorised(
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
     """
     Vectorised Brent's method for solving multiple root-finding problems.
-    
+
     This function solves multiple independent root-finding problems in parallel
     using Brent's method - the recommended general-purpose bracketing algorithm.
     Each problem can have different brackets and different function parameters,
     enabling efficient batch solving with guaranteed convergence and fast
     superlinear performance.
-    
+
     Brent's method combines the robustness of bisection with the speed of
     inverse quadratic interpolation and secant methods, making it ideal for
     production systems where reliability and performance both matter.
-    
+
     The vectorisation uses Numba's prange for automatic parallelization across
     CPU cores, with runtime code generation handling variable numbers of
     function parameters.
-    
+
     Parameters
     ----------
     func : callable
         Function for which to find roots. Must be JIT-compiled (@njit) and
         have signature: func(x, *params) -> float, where x is the independent
         variable and params are optional additional parameters.
-        
+
         The same function is used for all problems, but parameters can vary
         per problem via func_params.
     a : array_like, shape (n_solves,)
@@ -573,17 +573,17 @@ def _brent_vectorised(
     b : array_like, shape (n_solves,)
         Array of upper bracket bounds, one per problem. Each problem requires
         f(a[i]) * f(b[i]) < 0 for a valid bracket (sign change required).
-        
+
         Note: Input order of a and b doesn't matter; Brent's algorithm
         automatically reorients to maintain the best estimate.
     func_params : array_like or None, optional
         Function parameters for each problem. Can be:
-        
+
         - None: No parameters (func takes only x)
         - 1D array, shape (n_params,): Same parameters for ALL problems
           (broadcast to all)
         - 2D array, shape (n_solves, n_params): Different parameters per problem
-        
+
         Default is None.
     tol : float, default=1e-6
         Convergence tolerance for all problems. Each problem stops when
@@ -592,7 +592,7 @@ def _brent_vectorised(
         Maximum iterations allowed per problem. Brent's method typically
         converges in 5-15 iterations (much faster than bisection's 20-25),
         so 100 is more than sufficient.
-    
+
     Returns
     -------
     roots : ndarray, shape (n_solves,), dtype=float64
@@ -606,10 +606,10 @@ def _brent_vectorised(
         Lower values indicate faster convergence.
     converged : ndarray, shape (n_solves,), dtype=bool
         Convergence flags for each problem:
-        
+
         - True: Problem converged (tolerance met)
         - False: Invalid bracket (f(a)*f(b) > 0) or max_iter reached (rare)
-    
+
     See Also
     --------
     _brent_scalar : Scalar version for single problem
@@ -617,9 +617,8 @@ def _brent_vectorised(
     _newton_raphson_vectorised : Faster when derivative available
     generate_vectorised_solver : Code generator used internally
     _validate_and_prepare_params : Parameter validation and preparation
-    
-    """
 
+    """
 
     a = np.asarray(a, dtype=np.float64)
     n_solves = len(a)
@@ -641,44 +640,44 @@ def _validate_and_prepare_params(
 ) -> Tuple[npt.NDArray[np.float64], int]:
     """
     Validate and prepare function parameters for vectorised root-finding solvers.
-    
+
     This function standardizes function parameters into a consistent 2D array
     format (n_solves, n_params) required by the vectorised solvers. It handles
     multiple input formats with NumPy-style broadcasting semantics, ensuring
     compatibility with the code generation and parallelization systems.
-    
+
     The standardization enables vectorised solvers to handle variable numbers
     of function parameters while using Numba's prange for parallelization.
-    
+
     Parameters
     ----------
     func_params : array_like or None
         Function parameters for the vectorised solver. Accepts multiple formats:
-        
+
         - **None**: No parameters (function takes only x)
           Returns empty (n_solves, 0) array
-        
+
         - **0D scalar**: Single parameter value
           Broadcasts to (n_solves, 1) - same value for all problems
           Example: 5.0 → [[5.0], [5.0], [5.0]]
-        
+
         - **1D array**: Parameters for each problem OR broadcast parameters
-          
+
           **IMPORTANT:** Current implementation treats 1D as "one parameter per problem"
           Length must equal n_solves, reshaped to (n_solves, 1)
           Example: [1.0, 2.0, 3.0] with n_solves=3 → [[1.0], [2.0], [3.0]]
-          
+
           **Note:** This differs from NumPy broadcasting conventions.
           See Notes section for recommended broadcasting behavior.
-        
+
         - **2D array**: Different parameters per problem
           Shape must be (n_solves, n_params)
           Example: [[1.0, -4.0], [2.0, -8.0]] for 2 problems with 2 params each
-    
+
     n_solves : int
         Number of independent root-finding problems to solve. Must be positive.
         Determines the required length of the first dimension in output array.
-    
+
     Returns
     -------
     prepared_params : ndarray, shape (n_solves, n_params), dtype=float64
@@ -690,7 +689,7 @@ def _validate_and_prepare_params(
         - 0: No parameters
         - 1: One parameter per problem
         - N: N parameters per problem
-    
+
     Raises
     ------
     ValueError
@@ -701,7 +700,7 @@ def _validate_and_prepare_params(
         "func_params rows (M) must match number of solves (N)"
     ValueError
         If func_params has more than 2 dimensions (implicit from np.asarray)
-    
+
     See Also
     --------
     generate_vectorised_solver : Uses output to generate specialized solver code

@@ -19,53 +19,53 @@ def generate_vectorised_solver(
 ) -> Callable[[npt.ArrayLike], npt.NDArray[np.float64]]:
     """
     Generate a JIT-compiled vectorised solver from a scalar solver function.
-    
+
     This function creates specialized vectorised code at runtime to solve the
     problem of dynamic parameter unpacking in Numba's prange loops. Since
     Numba's parallel loops cannot dynamically unpack variable-length tuples
     (e.g., `*func_params`), this code generator creates a version with the
     exact number of parameters needed, enabling both parallelization and
     flexibility.
-    
+
     Parameters
     ----------
     scalar_func : callable
         Scalar solver function to be vectorised. Must be JIT-compiled with
         @njit and have one of these signatures:
-        
+
         - Open methods: func(f, f_prime, x0, tol, max_iter, *params)
         - Bracket methods: func(f, a, b, tol, max_iter, *params)
-        
+
         Where `*params` are 0 or more additional function parameters.
     num_params : int
         Number of function parameters. Must be >= 0. This determines how
         many parameter columns are expected in the func_params array.
-        
+
         - num_params=0: No parameters (func_params will be empty array)
         - num_params=1: One parameter per solve
         - num_params=N: N parameters per solve
     method_type : MethodType or str
         Type of solver method template to generate. Determines the signature
         and structure of the generated vectorised solver.
-        
+
         - MethodType.OPEN or 'open': For open methods (Newton, Secant)
           Requires x0 (initial guess)
         - MethodType.BRACKET or 'bracket': For bracket methods (Brent, Bisection)
           Requires a and b (bracket bounds)
-    
+
     Returns
     -------
     vectorised_solver : callable
         JIT-compiled vectorised solver function with signature:
-        
-        - Open methods: 
+
+        - Open methods:
           vectorised_solver(func, func_prime, func_params, x0, tol, max_iter)
           -> (roots, iterations, converged)
-          
+
         - Bracket methods:
           vectorised_solver(func, func_params, a, b, tol, max_iter)
           -> (roots, iterations, converged)
-        
+
         Where:
         - func: User's function to solve
         - func_prime: Derivative (open methods only)
@@ -74,7 +74,7 @@ def generate_vectorised_solver(
         - roots: ndarray, shape (n_solves,) - Root locations
         - iterations: ndarray, shape (n_solves,) - Iteration counts
         - converged: ndarray, shape (n_solves,) - Convergence flags
-    
+
     Raises
     ------
     ValueError

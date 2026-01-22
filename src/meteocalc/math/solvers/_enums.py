@@ -10,11 +10,11 @@ from enum import Enum
 class SolverName(Enum):
     """
     Enumeration of available root-finding solver algorithms.
-    
+
     This enum identifies which numerical algorithm to use for root finding.
     Each solver has different characteristics, convergence properties, and
     input requirements.
-    
+
     Attributes
     ----------
     NEWTON : str
@@ -27,7 +27,7 @@ class SolverName(Enum):
     BISECTION : str
         Bisection method. Simple and robust bracket-based method with
         guaranteed linear convergence. Slower but very reliable. Value: 'bisection'
-    
+
     See Also
     --------
     MethodType : Categorizes solvers by input requirements
@@ -42,11 +42,11 @@ class SolverName(Enum):
 class MethodType(Enum):
     """
     Enumeration of solver method categories based on input requirements.
-    
+
     This enum classifies root-finding methods by their algorithmic approach
     and input requirements. Used internally to determine which inputs are
     needed and how to structure solver calls.
-    
+
     Attributes
     ----------
     OPEN : str
@@ -71,7 +71,7 @@ class MethodType(Enum):
         User-defined or custom methods that don't fit standard categories.
         Input requirements determined by the specific implementation.
         Value: 'custom'
-    
+
     See Also
     --------
     SolverName : Identifies specific solver algorithms
