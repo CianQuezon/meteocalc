@@ -1,7 +1,7 @@
 from meteorological_equations.math.solvers._enums import MethodType, SolverName
 from meteorological_equations.math.solvers._solvers import (
-    BrentSolver,
     BisectionSolver,
+    BrentSolver,
     NewtonRaphsonSolver,
     Solver,
 )
