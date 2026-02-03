@@ -89,7 +89,9 @@ class TestBoltonEquation:
         temps = np.linspace(233.15, 323.15, 50)
         results = _bolton_vectorised(temps)
 
-        assert np.all(np.diff(results) > 0), "Vapor pressure should increase monotonically"
+        assert np.all(np.diff(results) > 0), (
+            "Vapor pressure should increase monotonically"
+        )
 
 
 # ============================================================================
@@ -122,7 +124,9 @@ class TestGoffGratchEquation:
         """Test Goff-Gratch ice equation at triple point."""
         result = _goff_gratch_scalar(273.16, *GOFF_GRATCH_ICE)
         expected = 6.1071
-        assert abs(result - expected) < 0.01, f"Expected {expected:.2f} hPa, got {result:.2f} hPa"
+        assert abs(result - expected) < 0.01, (
+            f"Expected {expected:.2f} hPa, got {result:.2f} hPa"
+        )
 
     def test_vectorised_matches_scalar(self):
         """Verify vectorized Goff-Gratch matches scalar."""
@@ -202,7 +206,9 @@ class TestCrossValidation:
             temps_k = temps_c + 273.15
 
             bolton_results = _bolton_vectorised(temps_k)
-            metpy_results = saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            metpy_results = (
+                saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            )
 
             # MetPy uses same Bolton formula, should match within 0.5%
             rel_diff = np.abs(bolton_results - metpy_results) / metpy_results
@@ -277,7 +283,9 @@ class TestCrossValidation:
             temps_c = np.array([0, 10, 20, 25, 30])
             temps_k = temps_c + 273.15
 
-            hyland_wexler_results = _hyland_wexler_vectorised(temps_k, *HYLAND_WEXLER_WATER)
+            hyland_wexler_results = _hyland_wexler_vectorised(
+                temps_k, *HYLAND_WEXLER_WATER
+            )
             psychro_results = np.array(
                 [
                     psychrolib.GetSatVapPres(t) / 100  # Convert Pa to hPa
@@ -328,7 +336,9 @@ class TestCrossValidation:
             temps_k = temps_c + 273.15
 
             goff_gratch_results = _goff_gratch_vector(temps_k, *GOFF_GRATCH_WATER)
-            metpy_results = saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            metpy_results = (
+                saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            )
 
             # MetPy uses Bolton, Goff-Gratch is different - allow 10% difference
             rel_diff = np.abs(goff_gratch_results - metpy_results) / metpy_results
@@ -348,8 +358,12 @@ class TestCrossValidation:
             temps_c = np.array([0, 10, 20, 25, 30])
             temps_k = temps_c + 273.15
 
-            hyland_wexler_results = _hyland_wexler_vectorised(temps_k, *HYLAND_WEXLER_WATER)
-            metpy_results = saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            hyland_wexler_results = _hyland_wexler_vectorised(
+                temps_k, *HYLAND_WEXLER_WATER
+            )
+            metpy_results = (
+                saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
+            )
 
             # MetPy uses Bolton, Hyland-Wexler is different - allow 10% difference
             rel_diff = np.abs(hyland_wexler_results - metpy_results) / metpy_results

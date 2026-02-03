@@ -309,7 +309,9 @@ class TestMetPyValidation:
             # Get our result
             our_result = bolton.calculate(temp_k)
 
-            assert_allclose(our_result, metpy_hpa, rtol=0.015, err_msg=f"Failed at {temp_c}°C")
+            assert_allclose(
+                our_result, metpy_hpa, rtol=0.015, err_msg=f"Failed at {temp_c}°C"
+            )
 
     @pytest.mark.skipif(not METPY_AVAILABLE, reason="MetPy not installed")
     def test_bolton_vs_metpy_array(self):
@@ -354,7 +356,9 @@ class TestMetPyValidation:
         temps_k = temps_c + 273.15
 
         # MetPy ice saturation vapor pressure
-        metpy_results = mpcalc.saturation_vapor_pressure(temps_c * units.degC, phase="solid")
+        metpy_results = mpcalc.saturation_vapor_pressure(
+            temps_c * units.degC, phase="solid"
+        )
         metpy_hpa = metpy_results.to("hPa").magnitude
 
         our_results = goff.calculate(temps_k)
@@ -402,7 +406,9 @@ class TestPsychroLibValidation:
             our_result = hyland.calculate(temp_k)
 
             # Should match very closely - both use Hyland-Wexler
-            assert_allclose(our_result, psychro_hpa, rtol=0.005, err_msg=f"Failed at {temp_c}°C")
+            assert_allclose(
+                our_result, psychro_hpa, rtol=0.005, err_msg=f"Failed at {temp_c}°C"
+            )
 
     @pytest.mark.skipif(not PSYCHROLIB_AVAILABLE, reason="PsychroLib not installed")
     def test_hyland_wexler_ice_vs_psychrolib(self):
@@ -420,7 +426,9 @@ class TestPsychroLibValidation:
 
             our_result = hyland.calculate(temp_k)
 
-            assert_allclose(our_result, psychro_hpa, rtol=0.005, err_msg=f"Failed at {temp_c}°C")
+            assert_allclose(
+                our_result, psychro_hpa, rtol=0.005, err_msg=f"Failed at {temp_c}°C"
+            )
 
     @pytest.mark.skipif(not PSYCHROLIB_AVAILABLE, reason="PsychroLib not installed")
     def test_hyland_wexler_array_vs_psychrolib(self):
@@ -469,7 +477,9 @@ class TestNOAAValidation:
         temp_k = temp_c + 273.15
 
         result = goff.calculate(temp_k)
-        assert_allclose(result, expected_hpa, rtol=0.01, err_msg=f"Failed for {description}")
+        assert_allclose(
+            result, expected_hpa, rtol=0.01, err_msg=f"Failed for {description}"
+        )
 
     @pytest.mark.parametrize(
         "temp_c,expected_hpa",
@@ -523,7 +533,8 @@ class TestComprehensiveCrossValidation:
     """Comprehensive cross-validation across all reference sources."""
 
     @pytest.mark.skipif(
-        not (METPY_AVAILABLE and PSYCHROLIB_AVAILABLE), reason="MetPy and PsychroLib required"
+        not (METPY_AVAILABLE and PSYCHROLIB_AVAILABLE),
+        reason="MetPy and PsychroLib required",
     )
     def test_all_libraries_agree_at_common_temps(self):
         """
@@ -555,7 +566,10 @@ class TestComprehensiveCrossValidation:
 
             # All should agree with MetPy
             assert_allclose(
-                goff_result, metpy_hpa, rtol=0.015, err_msg=f"Goff-Gratch vs MetPy at {temp_c}°C"
+                goff_result,
+                metpy_hpa,
+                rtol=0.015,
+                err_msg=f"Goff-Gratch vs MetPy at {temp_c}°C",
             )
             assert_allclose(
                 hyland_result,
@@ -564,7 +578,10 @@ class TestComprehensiveCrossValidation:
                 err_msg=f"Hyland-Wexler vs MetPy at {temp_c}°C",
             )
             assert_allclose(
-                bolton_result, metpy_hpa, rtol=0.015, err_msg=f"Bolton vs MetPy at {temp_c}°C"
+                bolton_result,
+                metpy_hpa,
+                rtol=0.015,
+                err_msg=f"Bolton vs MetPy at {temp_c}°C",
             )
 
             # Hyland-Wexler should match PsychroLib very closely
@@ -592,7 +609,8 @@ class TestComprehensiveCrossValidation:
         assert_allclose(our_results, metpy_hpa, rtol=0.01)
 
     @pytest.mark.skipif(
-        not (METPY_AVAILABLE and PSYCHROLIB_AVAILABLE), reason="MetPy and PsychroLib required"
+        not (METPY_AVAILABLE and PSYCHROLIB_AVAILABLE),
+        reason="MetPy and PsychroLib required",
     )
     def test_ice_phase_agreement(self):
         """Test that ice calculations agree across libraries."""
@@ -604,7 +622,9 @@ class TestComprehensiveCrossValidation:
 
         for temp_c, temp_k in zip(temps_c, temps_k):
             # MetPy
-            metpy_result = mpcalc.saturation_vapor_pressure(temp_c * units.degC, phase="solid")
+            metpy_result = mpcalc.saturation_vapor_pressure(
+                temp_c * units.degC, phase="solid"
+            )
             metpy_hpa = metpy_result.to("hPa").magnitude
 
             # PsychroLib (automatically uses ice for T < 0)
@@ -617,7 +637,10 @@ class TestComprehensiveCrossValidation:
 
             # Check agreement
             assert_allclose(
-                goff_result, metpy_hpa, rtol=0.02, err_msg=f"Goff-Gratch ice vs MetPy at {temp_c}°C"
+                goff_result,
+                metpy_hpa,
+                rtol=0.02,
+                err_msg=f"Goff-Gratch ice vs MetPy at {temp_c}°C",
             )
             assert_allclose(
                 goff_result,
