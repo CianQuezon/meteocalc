@@ -14,13 +14,17 @@ from enum import Enum
 class SurfaceType(Enum):
     """
     Surface type for vapor pressure calculations.
-
+    
     Different equations use different constants depending on surface types.
-
-    Args:
-        - AUTOMATIC = Automatically chooses ice and water surface type depending on temperature
-        - ICE = Uses ice constants for vapor saturation equation
-        - WATER = Uses water constants for vapor saturation equation
+    
+    Attributes
+    ----------
+    AUTOMATIC : str
+        Auto-selects ice/water based on temperature.
+    ICE : str
+        Uses ice surface constants.
+    WATER : str
+        Uses water surface constants.
     """
 
     AUTOMATIC = "automatic"
@@ -30,12 +34,16 @@ class SurfaceType(Enum):
 
 class EquationName(Enum):
     """
-    Equation names for the saturation vapor pressure equations.
-
-    Args:
-        - BOLTON
-        - GOFF_GRATCH
-        - HYLAND_WEXLER
+    Available saturation vapor pressure equation types.
+    
+    Attributes
+    ----------
+    BOLTON : str
+        Bolton equation.
+    GOFF_GRATCH : str
+        Goff-Gratch equation.
+    HYLAND_WEXLER : str
+        Hyland-Wexler equation.
     """
 
     BOLTON = "bolton"
