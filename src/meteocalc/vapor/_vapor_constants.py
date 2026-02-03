@@ -16,16 +16,26 @@ import numpy as np
 
 
 class GoffGratchConstants(NamedTuple):
-    """
-    A class which stores the constants for Goff Gratch saturation formula.
+    """Constants for Goff-Gratch saturation vapor pressure formula.
 
-    Equation:
-    log₁₀(eₛ) = -A(Tᵣₑf/T - 1)
-                + B·log₁₀(Tᵣₑf/T)
-                - C(10^(C_exp·(1 - T/Tᵣₑf)) - 1)
-                + D(10^(D_exp·(Tᵣₑf/T - 1)) - 1)
-                + log₁₀(pᵣₑf)
-
+    Attributes
+    ----------
+    T_ref : float
+        Reference temperature in Kelvin.
+    A : float
+        Coefficient for (T_ref/T - 1) term.
+    B : float
+        Coefficient for log₁₀(T_ref/T) term.
+    C : float
+        Coefficient for exponential term with C_exp.
+    C_exp : float
+        Exponent coefficient for C term.
+    D : float
+        Coefficient for exponential term with D_exp.
+    D_exp : float
+        Exponent coefficient for D term.
+    log_p_ref : float
+        Log₁₀ of reference pressure.
     """
 
     T_ref: float
@@ -62,12 +72,26 @@ GOFF_GRATCH_ICE = GoffGratchConstants(
 
 
 class HylandWexlerConstants(NamedTuple):
-    """
-    Class which stores the constants for Hyland Wexler saturation formula
+    """Constants for Hyland-Wexler saturation vapor pressure formula.
 
-    Equation:
-        ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
+    Attributes
+    ----------
+    A : float
+        Coefficient for 1/T term [K].
+    B : float
+        Constant coefficient [dimensionless].
+    C : float
+        Coefficient for T term [K⁻¹].
+    D : float
+        Coefficient for T² term [K⁻²].
+    E : float
+        Coefficient for T³ term [K⁻³].
+    F : float
+        Coefficient for T⁴ term [K⁻⁴].
+    G : float
+        Coefficient for ln(T) term [dimensionless].
     """
+
 
     A: float
     B: float
