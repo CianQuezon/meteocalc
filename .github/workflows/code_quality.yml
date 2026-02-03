@@ -1,0 +1,30 @@
+name: Code Quality
+
+on:
+  pull_request:
+  push:
+        branches: [main, 'features/**', 'WIP/**' ]
+
+jobs:
+  lint:
+    name: Lints the code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install ruff
+      - run: ruff check src/
+
+  format:
+    name: Checks Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install ruff
+      - run: ruff format --check .
