@@ -35,7 +35,8 @@ class Vapor:
 
     @staticmethod
     def get_equation(
-        equation: Union[str, EquationName], phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC
+        equation: Union[str, EquationName],
+        phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC,
     ) -> VaporEquation:
         """
         gets the specific saturation vapor equation.

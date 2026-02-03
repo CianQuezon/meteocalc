@@ -140,7 +140,9 @@ def _goff_gratch_vector(
     n = len(temp_k)
     result = np.empty(n, dtype=np.float64)
     for i in prange(n):
-        result[i] = _goff_gratch_scalar(temp_k[i], T_ref, A, B, C, C_exp, D, D_exp, log_p_ref)
+        result[i] = _goff_gratch_scalar(
+            temp_k[i], T_ref, A, B, C, C_exp, D, D_exp, log_p_ref
+        )
     return result
 
 
@@ -184,7 +186,14 @@ def _hyland_wexler_scalar(
 
 @njit(parallel=True, fastmath=True)
 def _hyland_wexler_vectorised(
-    temp_k: npt.ArrayLike, A: float, B: float, C: float, D: float, E: float, F: float, G: float
+    temp_k: npt.ArrayLike,
+    A: float,
+    B: float,
+    C: float,
+    D: float,
+    E: float,
+    F: float,
+    G: float,
 ) -> npt.ArrayLike:
     """
     Calculates saturation vapor using Hyland Wexler for Arrays

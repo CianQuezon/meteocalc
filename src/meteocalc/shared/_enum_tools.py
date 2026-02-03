@@ -35,4 +35,6 @@ def parse_enum(value: Union[str, E], enum_class: Type[E]) -> E:
                 f"Invalid enum '{value}'. Available are the following: [{valid_enums}]"
             ) from err
 
-    raise TypeError(f"value must be str or {enum_class.__name__}, got {type(value).__name__}")
+    raise TypeError(
+        f"value must be str or {enum_class.__name__}, got {type(value).__name__}"
+    )

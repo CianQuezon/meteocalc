@@ -86,7 +86,9 @@ class VaporEquation(ABC):
 
         temp_arr = np.asarray(temp_k)
 
-        at_freezing, above_freezing, below_freezing = self._detect_surface_type(temp_k=temp_arr)
+        at_freezing, above_freezing, below_freezing = self._detect_surface_type(
+            temp_k=temp_arr
+        )
 
         if temp_arr.ndim == 0:
             temp_val = temp_arr.item()
@@ -106,12 +108,18 @@ class VaporEquation(ABC):
             result = np.empty_like(temp_arr, dtype=np.float64)
 
             if np.any(above_freezing):
-                result[above_freezing] = vector_func(temp_arr[above_freezing], *water_constants)
+                result[above_freezing] = vector_func(
+                    temp_arr[above_freezing], *water_constants
+                )
             if np.any(below_freezing):
-                result[below_freezing] = vector_func(temp_arr[below_freezing], *ice_constants)
+                result[below_freezing] = vector_func(
+                    temp_arr[below_freezing], *ice_constants
+                )
             if np.any(at_freezing):
                 over_ice_results = vector_func(temp_arr[at_freezing], *ice_constants)
-                over_water_results = vector_func(temp_arr[at_freezing], *water_constants)
+                over_water_results = vector_func(
+                    temp_arr[at_freezing], *water_constants
+                )
                 result[at_freezing] = (over_ice_results + over_water_results) / 2
             return cast(np.ndarray, result)
 
@@ -201,7 +209,9 @@ class VaporEquation(ABC):
         pass
 
     @abstractmethod
-    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, float]:
+    def calculate(
+        self, temp_k: Union[npt.ArrayLike, float]
+    ) -> Union[npt.NDArray, float]:
         """
         Calculates saturation vapor at a given temperature.
 
@@ -239,7 +249,9 @@ class BoltonEquation(VaporEquation):
         """
         self.temp_bounds = (243.15, 313.15)
 
-    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
+    def calculate(
+        self, temp_k: Union[npt.ArrayLike, float]
+    ) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)
         self._check_bounds(temp_k=temp_k)
 
@@ -266,7 +278,9 @@ class GoffGratchEquation(VaporEquation):
         elif self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (173.15, 273.16)
 
-    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
+    def calculate(
+        self, temp_k: Union[npt.ArrayLike, float]
+    ) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)
         self._check_bounds(temp_k=temp_k)
 
@@ -311,7 +325,9 @@ class HylandWexlerEquation(VaporEquation):
         elif self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (173.15, 273.16)
 
-    def calculate(self, temp_k: Union[npt.ArrayLike, float]) -> Union[npt.NDArray, np.float64]:
+    def calculate(
+        self, temp_k: Union[npt.ArrayLike, float]
+    ) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)
         self._check_bounds(temp_k=temp_k)
 
