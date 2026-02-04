@@ -16,16 +16,16 @@ from typing import Callable, NamedTuple, Optional, Tuple, Union, cast
 import numpy as np
 import numpy.typing as npt
 
-from meteorological_equations.vapor._enums import EquationName, SurfaceType
-from meteorological_equations.vapor._jit_equations import (
+from meteocalc.vapor._enums import EquationName, SurfaceType
+from meteocalc.vapor._jit_equations import (
     _bolton_scalar,
     _bolton_vectorised,
     _goff_gratch_scalar,
-    _goff_gratch_vector,
+    _goff_gratch_vectorised,
     _hyland_wexler_scalar,
     _hyland_wexler_vectorised,
 )
-from meteorological_equations.vapor._vapor_constants import (
+from meteocalc.vapor._vapor_constants import (
     GOFF_GRATCH_ICE,
     GOFF_GRATCH_WATER,
     HYLAND_WEXLER_ICE,
@@ -422,7 +422,7 @@ class GoffGratchEquation(VaporEquation):
             return self._calculate_automatic_equation(
                 temp_k=temp_k,
                 scalar_func=_goff_gratch_scalar,
-                vector_func=_goff_gratch_vector,
+                vector_func=_goff_gratch_vectorised,
                 water_constants=GOFF_GRATCH_WATER,
                 ice_constants=GOFF_GRATCH_ICE,
             )
@@ -431,7 +431,7 @@ class GoffGratchEquation(VaporEquation):
             return self._dispatch_scalar_or_vector(
                 temp_k=temp_k,
                 scalar_func=_goff_gratch_scalar,
-                vector_func=_goff_gratch_vector,
+                vector_func=_goff_gratch_vectorised,
                 equation_constant=GOFF_GRATCH_WATER,
             )
 
@@ -439,7 +439,7 @@ class GoffGratchEquation(VaporEquation):
             return self._dispatch_scalar_or_vector(
                 temp_k=temp_k,
                 scalar_func=_goff_gratch_scalar,
-                vector_func=_goff_gratch_vector,
+                vector_func=_goff_gratch_vectorised,
                 equation_constant=GOFF_GRATCH_ICE,
             )
 

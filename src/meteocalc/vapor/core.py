@@ -9,9 +9,9 @@ from typing import List, Union
 
 import numpy as np
 
-from meteorological_equations.shared._enum_tools import parse_enum
-from meteorological_equations.vapor._enums import EquationName, SurfaceType
-from meteorological_equations.vapor._vapor_equations import (
+from meteocalc.shared._enum_tools import parse_enum
+from meteocalc.vapor._enums import EquationName, SurfaceType
+from meteocalc.vapor._vapor_equations import (
     BoltonEquation,
     GoffGratchEquation,
     HylandWexlerEquation,
