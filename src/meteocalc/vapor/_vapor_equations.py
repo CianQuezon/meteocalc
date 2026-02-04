@@ -34,13 +34,34 @@ from meteorological_equations.vapor._vapor_constants import (
 
 
 class VaporEquation(ABC):
-    """
-    Abstract Base class for vapor pressure equations.
+    """Abstract base class for vapor pressure equations.
 
-    Attributes:
-        - over_ice (bool) = vapor pressure over liquid or ice
-        - temp_bounds(Tuple[float, float]) = Temperature range (min, max) in kelvin for the equation
-        - name (str) = Class variable for identifying the equation name.
+    This class provides a common interface for different saturation vapor pressure
+    calculation methods. Subclasses implement specific equations (Bolton, Goff-Gratch,
+    Hyland-Wexler) with support for calculations over water, ice, or automatic surface
+    type detection.
+
+    Parameters
+    ----------
+    surface_type : SurfaceType or str, default=SurfaceType.AUTOMATIC
+        Surface type for vapor pressure calculations. Options are:
+        - 'automatic': Auto-selects ice/water based on temperature
+        - 'ice': Uses ice surface constants
+        - 'water': Uses water surface constants
+
+    Attributes
+    ----------
+    surface_type : SurfaceType
+        The surface type used for calculations.
+    temp_bounds : tuple of float
+        Valid temperature range (min, max) in Kelvin for the equation.
+    name : EquationName
+        Identifier for the equation type.
+
+    Raises
+    ------
+    ValueError
+        If an invalid surface type string is provided.
     """
 
     surface_type: SurfaceType
@@ -67,21 +88,30 @@ class VaporEquation(ABC):
         water_constants: NamedTuple,
         ice_constants: NamedTuple,
     ) -> Union[np.ndarray, float]:
-        """
-        auto detects the temperature at the following classifications:
-            - above_freezing = above freezing point (above (273.15 + tolerance)). It uses over water constants
-            - below_freezing = below freezing point (below (273.15 + tolerance)). It uses over ice constants
-            - at_freezing = at freezing point ((abs(temp - 273.15)) <= tolerance). It averages both water and ice constant results.
+        """Automatically select and calculate vapor pressure based on temperature.
 
-        Args:
-            - temp_k (Union[npt.ArrayLike, float]) = scalar or an array of temperatures in Kelvin
-            - scalar_func(Callable[[float, Optional[NamedTuple]], float]) = scalar function that takes in a temperature with optional, either water or ice constants.
-            - vector_func(Callable[[np.ndarray, Optional[NamedTuple]], np.ndarray]) = vectorised function that takes in temperature array and outputs an array of vapor saturation in hPa. Optionally uses water or ice constants.
-            - water_constants(Optional[Named_Tuple]) = water constants for over water equation
-            - ice_constants(Optional[Named_Tuple]) =ice constants for over ice equation
+        Determines surface type based on temperature relative to freezing point:
+        - Above 273.15 K: uses water constants
+        - Below 273.15 K: uses ice constants
+        - At 273.15 K (within tolerance): averages water and ice results
 
-        Returns:
-            Array or scalar saturation vapor in hPA
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
+        scalar_func : callable
+            Scalar calculation function.
+        vector_func : callable
+            Vectorized calculation function.
+        water_constants : NamedTuple
+            Constants for water surface calculations.
+        ice_constants : NamedTuple
+            Constants for ice surface calculations.
+
+        Returns
+        -------
+        float or ndarray
+            Saturation vapor pressure in hPa.
         """
 
         temp_arr = np.asarray(temp_k)
@@ -130,18 +160,23 @@ class VaporEquation(ABC):
         vector_func: Callable[[np.ndarray], np.ndarray],
         equation_constant: Optional[NamedTuple],
     ) -> Union[np.ndarray, float]:
-        """
-        calculates saturation vapor using the equation's scalar or vectorised function depending on
-        input temperature dimensions.
+        """Dispatch to scalar or vectorized calculation based on input shape.
 
-        Args:
-         - temp_k (Union[npt.ArrayLike, float]) = scalar or an array of temperatures in Kelvin
-         - scalar_func(Callable[[float, Optional[NamedTuple]], float]) = scalar function that takes in a temperature with optional, either water or ice constants.
-         - vector_func(Callable[[np.ndarray, Optional[NamedTuple]], np.ndarray]) = vectorised function that takes in temperature array and outputs an array of vapor saturation in hPa. Optionally uses water or ice constants.
-         - equation_constants(Optional[Named_Tuple]) = Optionally passes either ice or water constants for the vapor equation
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
+        scalar_func : callable
+            Function for scalar calculations.
+        vector_func : callable
+            Function for vectorized calculations.
+        equation_constant : NamedTuple or None
+            Equation constants (water or ice).
 
-         Returns:
-          Array or scalar saturation vapor in hPA
+        Returns
+        -------
+        float or ndarray
+            Saturation vapor pressure in hPa.
         """
         temp_k = np.asarray(temp_k)
         if temp_k.ndim == 0:
@@ -161,11 +196,19 @@ class VaporEquation(ABC):
             return cast(np.ndarray, vapor_pressure.reshape(temp_k_original_shape))
 
     def _check_bounds(self, temp_k: Union[npt.ArrayLike, float]) -> None:
-        """
-        Checks if temperature is within the valid range and sets out a warning if not.
+        """Check if temperature is within valid equation range.
 
-        Args:
-         - temp_k (Union[npt.ArrayLike, float]) = Array or scalar temperature in kelvin
+        Issues a warning if any temperature values fall outside the valid range.
+
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
+
+        Warnings
+        --------
+        UserWarning
+            If temperature is outside the valid range for this equation.
         """
         temp_array = np.asarray(temp_k)
         min_bound, max_bound = self.temp_bounds
@@ -181,16 +224,23 @@ class VaporEquation(ABC):
     def _detect_surface_type(
         self, temp_k: Union[float, npt.ArrayLike], tolerance: float = 1e-6
     ) -> npt.NDArray:
-        """
-        automatic surface type detection based on over water and ice temperature range.
+        """Detect surface type based on temperature relative to freezing point.
 
-        Args:
-            - temp_k (Union[float, npt.ArrayLike]) = Scalar or array of temperature in Kelvin.
-            - tolerance (float) = tolerance of temperature considered to be at freezing point.
-        Returns:
-            - at_freezing (npt.NDArray) = Boolean mask of temperature at freezing point and within tolerance
-            - above_freezing (npt.NDArray) = Boolean mask of temperature above freezing point
-            - below_freezing (npt.NDArray) = Boolean mask of temperature below freezing point
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
+        tolerance : float, default=1e-6
+            Temperature tolerance for freezing point detection.
+
+        Returns
+        -------
+        at_freezing : ndarray
+            Boolean mask where temperature is at freezing point (within tolerance).
+        above_freezing : ndarray
+            Boolean mask where temperature is above freezing point.
+        below_freezing : ndarray
+            Boolean mask where temperature is below freezing point.
         """
         temp_k = np.asarray(temp_k)
         freezing_point = 273.15
@@ -203,8 +253,10 @@ class VaporEquation(ABC):
 
     @abstractmethod
     def _update_temp_bounds(self) -> None:
-        """
-        Sets the temperature bounds of the equation
+        """Update temperature bounds based on surface type.
+
+        Must be implemented by subclasses to set appropriate temperature
+        ranges for the specific equation.
         """
         pass
 
@@ -212,25 +264,61 @@ class VaporEquation(ABC):
     def calculate(
         self, temp_k: Union[npt.ArrayLike, float]
     ) -> Union[npt.NDArray, float]:
-        """
-        Calculates saturation vapor at a given temperature.
+        """Calculate saturation vapor pressure at given temperature(s).
 
-        Args:
-         - temp_k (Union[npt.ArrayLike, float]) = Array or scalar temperature in kelvin
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
 
-        Returns:
-            Returns either an array [npt.ArrayLike] or scalar [np.float64] of saturated vapour in hPa
+        Returns
+        -------
+        float or ndarray
+            Saturation vapor pressure in hPa.
+
+        Warnings
+        --------
+        UserWarning
+            If temperature is outside the valid range for this equation.
         """
         pass
 
 
 class BoltonEquation(VaporEquation):
-    """
-    Calculates saturation vapor using Bolton Equation
+    """Saturation vapor pressure using Bolton's equation.
 
-    Notes:
-        - Bolton Equation has only over water calculations
+    Bolton's equation is a simplified empirical formula valid for temperatures
+    between -30°C and 40°C. This equation only supports calculations over water.
+
+    Parameters
+    ----------
+    surface_type : SurfaceType or str, default=SurfaceType.WATER
+        Must be 'water'. Other surface types are not supported.
+
+    Attributes
+    ----------
+    name : EquationName
+        Set to EquationName.BOLTON.
+    temp_bounds : tuple of float
+        Valid temperature range: (243.15 K, 313.15 K) or (-30°C, 40°C).
+
+    Raises
+    ------
+    ValueError
+        If surface_type is set to 'ice' (not supported by Bolton equation).
+
+    Examples
+    --------
+    >>> bolton = BoltonEquation()
+    >>> temp = 293.15  # 20°C
+    >>> vapor_pressure = bolton.calculate(temp)
+
+    Notes
+    -----
+    Bolton's equation is: es = 6.112 * exp((17.67 * T_c) / (T_c + 243.5))
+    where T_c is temperature in Celsius and es is in hPa.
     """
+
 
     name: EquationName = EquationName.BOLTON
 
@@ -244,9 +332,7 @@ class BoltonEquation(VaporEquation):
         super().__init__(surface_type)
 
     def _update_temp_bounds(self) -> None:
-        """
-        Bolton has a fixed temperature range since it only supports over water equation.
-        """
+        """Set Bolton equation temperature bounds (243.15 K to 313.15 K)."""
         self.temp_bounds = (243.15, 313.15)
 
     def calculate(
@@ -254,7 +340,23 @@ class BoltonEquation(VaporEquation):
     ) -> Union[npt.NDArray, np.float64]:
         temp_k = np.asarray(temp_k)
         self._check_bounds(temp_k=temp_k)
+        """Calculate saturation vapor pressure using Bolton's equation.
 
+        Parameters
+        ----------
+        temp_k : float or array_like
+            Temperature(s) in Kelvin.
+
+        Returns
+        -------
+        float or ndarray
+            Saturation vapor pressure in hPa.
+
+        Warnings
+        --------
+        UserWarning
+            If temperature is outside the valid range (243.15 K to 313.15 K).
+        """
         return self._dispatch_scalar_or_vector(
             temp_k=temp_k,
             scalar_func=_bolton_scalar,
@@ -264,8 +366,40 @@ class BoltonEquation(VaporEquation):
 
 
 class GoffGratchEquation(VaporEquation):
-    """
-    Calculates saturation vapor using Goff Gratch Equation
+    """Saturation vapor pressure using Goff-Gratch equation.
+
+    The Goff-Gratch equation is a highly accurate formulation recommended by
+    the World Meteorological Organization (WMO). It supports calculations over
+    both water and ice surfaces.
+
+    Parameters
+    ----------
+    surface_type : SurfaceType or str, default=SurfaceType.AUTOMATIC
+        Surface type for calculations:
+        - 'automatic': Auto-selects based on temperature
+        - 'water': Over liquid water (273.15 K to 373.15 K)
+        - 'ice': Over ice (173.15 K to 273.16 K)
+
+    Attributes
+    ----------
+    name : EquationName
+        Set to EquationName.GOFF_GRATCH.
+    temp_bounds : tuple of float
+        Valid temperature range depending on surface_type:
+        - automatic: (173.15 K, 373.15 K)
+        - water: (273.15 K, 373.15 K)
+        - ice: (173.15 K, 273.16 K)
+
+    Examples
+    --------
+    >>> # Automatic surface type selection
+    >>> goff = GoffGratchEquation(surface_type='automatic')
+    >>> temps = np.array([263.15, 273.15, 283.15])  # Below, at, above freezing
+    >>> vapor_pressures = goff.calculate(temps)
+
+    >>> # Explicit water surface
+    >>> goff_water = GoffGratchEquation(surface_type='water')
+    >>> vapor_pressure = goff_water.calculate(293.15)
     """
 
     name: EquationName = EquationName.GOFF_GRATCH
@@ -311,9 +445,42 @@ class GoffGratchEquation(VaporEquation):
 
 
 class HylandWexlerEquation(VaporEquation):
+    """Saturation vapor pressure using Hyland-Wexler equation.
+
+    The Hyland-Wexler equation provides high accuracy over a wide temperature
+    range and supports calculations over both water and ice surfaces. This
+    formulation is commonly used in HVAC and meteorological applications.
+
+    Parameters
+    ----------
+    surface_type : SurfaceType or str, default=SurfaceType.AUTOMATIC
+        Surface type for calculations:
+        - 'automatic': Auto-selects based on temperature
+        - 'water': Over liquid water (273.15 K to 473.15 K)
+        - 'ice': Over ice (173.15 K to 273.16 K)
+
+    Attributes
+    ----------
+    name : EquationName
+        Set to EquationName.HYLAND_WEXLER.
+    temp_bounds : tuple of float
+        Valid temperature range depending on surface_type:
+        - automatic: (173.15 K, 473.15 K)
+        - water: (273.15 K, 473.15 K)
+        - ice: (173.15 K, 273.16 K)
+
+    Examples
+    --------
+    >>> # Automatic surface type selection
+    >>> hyland = HylandWexlerEquation(surface_type='automatic')
+    >>> temp = 298.15  # 25°C
+    >>> vapor_pressure = hyland.calculate(temp)
+
+    >>> # Calculate for array of temperatures
+    >>> temps = np.linspace(273.15, 373.15, 10)
+    >>> vapor_pressures = hyland.calculate(temps)
     """
-    Calculates saturation vapor using Hyland Wexler Equation
-    """
+
 
     name: EquationName = EquationName.HYLAND_WEXLER
 
