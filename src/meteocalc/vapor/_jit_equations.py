@@ -16,14 +16,17 @@ from numba import njit, prange
 
 @njit
 def _bolton_scalar(temp_k: float) -> float:
-    """
-    Calculate saturation vapor pressure using Bolton's equation.
+    """Calculate saturation vapor pressure using Bolton's equation.
 
-    Args:
-        temp_k: Temperature in Kelvin
+    Parameters
+    ----------
+    temp_k : float
+        Temperature in Kelvin.
 
-    Returns:
-        Saturation vapor pressure in hPa (millibars)
+    Returns
+    -------
+    float
+        Saturation vapor pressure in hPa.
     """
     temp_c = temp_k - 273.15
     return float(6.112 * np.exp((17.67 * temp_c) / (temp_c + 243.5)))
@@ -31,14 +34,17 @@ def _bolton_scalar(temp_k: float) -> float:
 
 @njit(parallel=True, fastmath=True)
 def _bolton_vectorised(temp_k: npt.ArrayLike) -> npt.NDArray[np.float64]:
-    """
-    Calculates saturation vapor pressure arrays using Bolton's equation
+    """Calculate saturation vapor pressure arrays using Bolton's equation.
 
-    Args:
-        temp_k: Array of temperature in Kelvin
+    Parameters
+    ----------
+    temp_k : array_like
+        Array of temperatures in Kelvin.
 
-    Returns:
-        Saturation Vapor Pressure in hPa (millibars)
+    Returns
+    -------
+    ndarray
+        Saturation vapor pressure in hPa.
     """
 
     n = len(temp_k)
@@ -61,30 +67,27 @@ def _goff_gratch_scalar(
     D_exp: float,
     log_p_ref: float,
 ) -> float:
-    """
-    Calculates saturation vapour pressure using Goff Gratch equation.
-    Water and Ice equations difference is that some constants are omitted
-    in over water.
+    """Calculate saturation vapor pressure using Goff-Gratch equation.
 
-    Equation:
-        log₁₀(eₛ) = -A(Tᵣₑf/T - 1)
-                    + B·log₁₀(Tᵣₑf/T)
-                    - C(10^(C_exp·(1 - T/Tᵣₑf)) - 1)
-                    + D(10^(D_exp·(Tᵣₑf/T - 1)) - 1)
-                    + log₁₀(pᵣₑf)
+    Implements the Goff-Gratch equation. Ice equation omits D term (D=0, D_exp=0).
 
-    Args:
-        temp_k: Temperature in Kelvin
-        T_ref: Reference temperature in Kelvin
-        A, B, C, D: Equation coefficients
-        C_exp, D_exp: Exponent coefficients
-        log_p_ref: Log10 of reference pressure
+    Parameters
+    ----------
+    temp_k : float
+        Temperature in Kelvin.
+    T_ref : float
+        Reference temperature in Kelvin.
+    A, B, C, D : float
+        Equation coefficients.
+    C_exp, D_exp : float
+        Exponent coefficients.
+    log_p_ref : float
+        Log10 of reference pressure.
 
-    Returns:
-        Saturation vapor pressure in hPa
-
-    Note:
-        Ice equation omits D term (D=0, D_exp=0)
+    Returns
+    -------
+    float
+        Saturation vapor pressure in hPa.
     """
 
     A_sum = A * (T_ref / temp_k - 1)
@@ -103,7 +106,7 @@ def _goff_gratch_scalar(
 
 
 @njit(parallel=True, fastmath=True)
-def _goff_gratch_vector(
+def _goff_gratch_vectorised(
     temp_k: npt.ArrayLike,
     T_ref: float,
     A: float,
@@ -114,28 +117,27 @@ def _goff_gratch_vector(
     D_exp: float,
     log_p_ref: float,
 ) -> npt.NDArray[np.float64]:
-    """
-    Calculates saturation vapour pressure using Goff Gratch equation for Arrays.
+    """Calculate saturation vapor pressure arrays using Goff-Gratch equation.
 
-    Equation:
-        log₁₀(eₛ) = -A(Tᵣₑf/T - 1)
-                    + B·log₁₀(Tᵣₑf/T)
-                    - C(10^(C_exp·(1 - T/Tᵣₑf)) - 1)
-                    + D(10^(D_exp·(Tᵣₑf/T - 1)) - 1)
-                    + log₁₀(pᵣₑf)
+    Vectorized implementation. Ice equation omits D term (D=0, D_exp=0).
 
-    Args:
-        temp_k: Array of Temperature in Kelvin
-        T_ref: Reference temperature in Kelvin
-        A, B, C, D: Equation coefficients
-        C_exp, D_exp: Exponent coefficients
-        log_p_ref: Log10 of reference pressure
+    Parameters
+    ----------
+    temp_k : array_like
+        Array of temperatures in Kelvin.
+    T_ref : float
+        Reference temperature in Kelvin.
+    A, B, C, D : float
+        Equation coefficients.
+    C_exp, D_exp : float
+        Exponent coefficients.
+    log_p_ref : float
+        Log10 of reference pressure.
 
-    Returns:
-        Saturation vapor pressure in hPa
-
-    Note:
-        Ice equation omits D term (D=0, D_exp=0)
+    Returns
+    -------
+    ndarray
+        Saturation vapor pressure in hPa.
     """
     n = len(temp_k)
     result = np.empty(n, dtype=np.float64)
@@ -150,27 +152,32 @@ def _goff_gratch_vector(
 def _hyland_wexler_scalar(
     temp_k: float, A: float, B: float, C: float, D: float, E: float, F: float, G: float
 ) -> float:
+    """Calculate saturation vapor pressure arrays using Hyland-Wexler equation.
+
+    Parameters
+    ----------
+    temp_k : array_like
+        Array of temperatures in Kelvin.
+    A : float
+        Coefficient for 1/T term [K].
+    B : float
+        Constant coefficient [dimensionless].
+    C : float
+        Coefficient for T term [K⁻¹].
+    D : float
+        Coefficient for T² term [K⁻²].
+    E : float
+        Coefficient for T³ term [K⁻³].
+    F : float
+        Coefficient for T⁴ term [K⁻⁴].
+    G : float
+        Coefficient for ln(T) term [dimensionless].
+
+    Returns
+    -------
+    ndarray
+        Saturation vapor pressure in hPa.
     """
-    Function which calculates vapor saturation using Hyland Wexler.
-
-    Equation:
-        ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
-
-    Args:
-        temp_k: Array of temperatures in Kelvin
-        A: Coefficient for 1/T term [K]
-        B: Constant coefficient [dimensionless]
-        C: Coefficient for T term [K⁻¹]
-        D: Coefficient for T² term [K⁻²]
-        E: Coefficient for T³ term [K⁻³]
-        F: Coefficient for T⁴ term [K⁻⁴]
-        G: Coefficient for ln(T) term [dimensionless]
-
-    Returns:
-        Saturation vapor pressure in hectoPascals (hPa)
-
-    """
-
     A_sum = A / temp_k
     B_sum = B
     C_sum = C * temp_k
@@ -195,24 +202,31 @@ def _hyland_wexler_vectorised(
     F: float,
     G: float,
 ) -> npt.ArrayLike:
-    """
-    Calculates saturation vapor using Hyland Wexler for Arrays
+    """Calculate saturation vapor pressure arrays using Hyland-Wexler equation.
 
-    Equation:
-        ln(eᵢ) = -A/T + B - C·T + D·T² + E·T³ - F·T⁴ + G·ln(T)
+    Parameters
+    ----------
+    temp_k : array_like
+        Array of temperatures in Kelvin.
+    A : float
+        Coefficient for 1/T term [K].
+    B : float
+        Constant coefficient [dimensionless].
+    C : float
+        Coefficient for T term [K⁻¹].
+    D : float
+        Coefficient for T² term [K⁻²].
+    E : float
+        Coefficient for T³ term [K⁻³].
+    F : float
+        Coefficient for T⁴ term [K⁻⁴].
+    G : float
+        Coefficient for ln(T) term [dimensionless].
 
-    Args:
-        temp_k: Array of temperatures in Kelvin
-        A: Coefficient for 1/T term [K]
-        B: Constant coefficient [dimensionless]
-        C: Coefficient for T term [K⁻¹]
-        D: Coefficient for T² term [K⁻²]
-        E: Coefficient for T³ term [K⁻³]
-        F: Coefficient for T⁴ term [K⁻⁴]
-        G: Coefficient for ln(T) term [dimensionless]
-
-    Returns:
-        Saturation vapor pressure in hectoPascals (hPa)
+    Returns
+    -------
+    ndarray
+        Saturation vapor pressure in hPa.
     """
     n = len(temp_k)
     result = np.empty(n, dtype=np.float64)
