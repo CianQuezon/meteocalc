@@ -13,15 +13,15 @@ Author: Test Suite for Cian Quezon's meteorological equations
 import numpy as np
 import pytest
 
-from meteorological_equations.vapor._jit_equations import (
+from meteocalc.vapor._jit_equations import (
     _bolton_scalar,
     _bolton_vectorised,
     _goff_gratch_scalar,
-    _goff_gratch_vector,
+    _goff_gratch_vectorised,
     _hyland_wexler_scalar,
     _hyland_wexler_vectorised,
 )
-from meteorological_equations.vapor._vapor_constants import (
+from meteocalc.vapor._vapor_constants import (
     GOFF_GRATCH_ICE,
     GOFF_GRATCH_WATER,
     HYLAND_WEXLER_WATER,
@@ -131,7 +131,7 @@ class TestGoffGratchEquation:
     def test_vectorised_matches_scalar(self):
         """Verify vectorized Goff-Gratch matches scalar."""
         temps = np.array([273.15, 283.15, 293.15, 303.15, 313.15])
-        vec_result = _goff_gratch_vector(temps, *GOFF_GRATCH_WATER)
+        vec_result = _goff_gratch_vectorised(temps, *GOFF_GRATCH_WATER)
 
         for i, temp in enumerate(temps):
             scalar_result = _goff_gratch_scalar(temp, *GOFF_GRATCH_WATER)
@@ -140,7 +140,7 @@ class TestGoffGratchEquation:
     def test_monotonic_increase(self):
         """Verify vapor pressure increases with temperature."""
         temps = np.array([280.0, 290.0, 300.0, 310.0, 320.0])
-        results = _goff_gratch_vector(temps, *GOFF_GRATCH_WATER)
+        results = _goff_gratch_vectorised(temps, *GOFF_GRATCH_WATER)
 
         assert np.all(np.diff(results) > 0), "Should increase monotonically"
 
@@ -256,7 +256,7 @@ class TestCrossValidation:
             temps_c = np.array([0, 10, 20, 25, 30])
             temps_k = temps_c + 273.15
 
-            goff_gratch_results = _goff_gratch_vector(temps_k, *GOFF_GRATCH_WATER)
+            goff_gratch_results = _goff_gratch_vectorised(temps_k, *GOFF_GRATCH_WATER)
             psychro_results = np.array(
                 [
                     psychrolib.GetSatVapPres(t) / 100  # Convert Pa to hPa
@@ -312,7 +312,7 @@ class TestCrossValidation:
         temps_k = np.array([273.15, 283.15, 293.15, 303.15, 313.15])
 
         bolton = _bolton_vectorised(temps_k)
-        goff_gratch = _goff_gratch_vector(temps_k, *GOFF_GRATCH_WATER)
+        goff_gratch = _goff_gratch_vectorised(temps_k, *GOFF_GRATCH_WATER)
         hyland_wexler = _hyland_wexler_vectorised(temps_k, *HYLAND_WEXLER_WATER)
 
         # Compare each pair
@@ -335,7 +335,7 @@ class TestCrossValidation:
             temps_c = np.array([0, 10, 20, 25, 30])
             temps_k = temps_c + 273.15
 
-            goff_gratch_results = _goff_gratch_vector(temps_k, *GOFF_GRATCH_WATER)
+            goff_gratch_results = _goff_gratch_vectorised(temps_k, *GOFF_GRATCH_WATER)
             metpy_results = (
                 saturation_vapor_pressure(temps_c * units.degC).to("hPa").magnitude
             )
@@ -396,7 +396,7 @@ class TestEdgeCases:
         empty = np.array([], dtype=np.float64)
 
         result_bolton = _bolton_vectorised(empty)
-        result_gg = _goff_gratch_vector(empty, *GOFF_GRATCH_WATER)
+        result_gg = _goff_gratch_vectorised(empty, *GOFF_GRATCH_WATER)
         result_hw = _hyland_wexler_vectorised(empty, *HYLAND_WEXLER_WATER)
 
         assert len(result_bolton) == 0
@@ -417,7 +417,7 @@ class TestEdgeCases:
         temps = np.linspace(233.15, 373.15, 100)
 
         bolton_results = _bolton_vectorised(temps)
-        gg_results = _goff_gratch_vector(temps, *GOFF_GRATCH_WATER)
+        gg_results = _goff_gratch_vectorised(temps, *GOFF_GRATCH_WATER)
         hw_results = _hyland_wexler_vectorised(temps, *HYLAND_WEXLER_WATER)
 
         assert not np.any(np.isnan(bolton_results))
