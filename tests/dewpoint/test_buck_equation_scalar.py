@@ -83,11 +83,8 @@ def get_psychrolib_dewpoint(temp_k, rh):
     
     temp_c = kelvin_to_celsius(temp_k)
     
-    # PsychroLib expects RH as percentage
-    rh_percent = rh * 100.0
-    
     # Calculate dew point
-    td_c = psy.GetTDewPointFromRelHum(temp_c, rh_percent)
+    td_c = psy.GetTDewPointFromRelHum(temp_c, rh)
     
     return celsius_to_kelvin(td_c)
 
