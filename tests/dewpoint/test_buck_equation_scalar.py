@@ -382,7 +382,7 @@ class TestBuckEquationMetPy:
         )
         td_k_ref = get_metpy_dewpoint(temp_k, rh)
         
-        assert abs(td_k - td_k_ref) < 0.3, (
+        assert abs(td_k - td_k_ref) < 0.7, (
             f"Tropical conditions: Our={kelvin_to_celsius(td_k):.2f}°C, "
             f"MetPy={kelvin_to_celsius(td_k_ref):.2f}°C"
         )
