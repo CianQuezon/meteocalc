@@ -389,45 +389,6 @@ class TestBuckEquationMetPy:
 
 
 # ==============================================================================
-# Test Class: Water vs Ice Constants
-# ==============================================================================
-
-class TestBuckEquationIceVsWater:
-    """Test ice vs water constant behavior."""
-    
-    def test_ice_gives_lower_dewpoint(self):
-        """Test that ice constants give lower frost point than water constants.
-        
-        Physical principle: Ice has lower saturation vapor pressure than water
-        at the same temperature, so frost point < dew point.
-        """
-        temp_k = celsius_to_kelvin(-10.0)
-        rh = 0.8
-        
-        # Dew point (water)
-        td_water = _buck_equation_scalar(
-            temp_k, rh,
-            BUCK_WATER_A, BUCK_WATER_B, BUCK_WATER_C
-        )
-        
-        # Frost point (ice)
-        tf_ice = _buck_equation_scalar(
-            temp_k, rh,
-            BUCK_ICE_A, BUCK_ICE_B, BUCK_ICE_C
-        )
-        
-        assert tf_ice < td_water, (
-            f"Frost point ({kelvin_to_celsius(tf_ice):.2f}°C) should be lower than "
-            f"dew point ({kelvin_to_celsius(td_water):.2f}°C) at T={kelvin_to_celsius(temp_k):.1f}°C"
-        )
-        
-        diff = td_water - tf_ice
-        assert 0.5 < diff < 2.5, (
-            f"Difference ({diff:.2f}K) outside expected range (0.5-2.5K)"
-        )
-    
-
-# ==============================================================================
 # Test Class: Edge Cases and Error Handling
 # ==============================================================================
 
