@@ -458,10 +458,11 @@ class TestMagnusEquationIceVsWater:
     @pytest.mark.parametrize("temp_c", [-20, -15, -10, -5, -2])
     @pytest.mark.parametrize("rh", [0.6, 0.8])
     def test_frostpoint_lower_than_dewpoint(self, temp_c, rh):
-        """Test fundamental physics: frost point < dew point.
+        """Test fundamental physics: frost point > dew point.
         
-        At temperatures below 0°C, ice has lower saturation vapor pressure
-        than supercooled water, so frost point must be lower than dew point.
+        At temperatures below 0°C, the frost point is higher than the dewpoint
+        since it is harder for water molecules to escape from an ice surface compared to
+        a liquid surface.
         """
         temp_k = celsius_to_kelvin(temp_c)
         
