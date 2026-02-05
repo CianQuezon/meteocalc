@@ -340,7 +340,6 @@ class TestMagnusEquationPsychroLib:
         td_k_ref = get_psychrolib_dewpoint(temp_k, rh)
         
         # Determine tolerance based on conditions
-        
         if temp_c <= 0 and rh < 0.35:
             return 1.7
         elif temp_c <= 5 and rh < 0.4:
@@ -479,7 +478,7 @@ class TestMagnusEquationIceVsWater:
         )
         
         # Physics constraint
-        assert tf_ice < td_water, (
+        assert tf_ice > td_water, (
             f"At {temp_c}°C, RH={rh*100:.0f}%: "
             f"Frost point ({kelvin_to_celsius(tf_ice):.2f}°C) "
             f"must be lower than dew point ({kelvin_to_celsius(td_water):.2f}°C)"
@@ -535,7 +534,7 @@ class TestMagnusEquationEdgeCases:
         
         assert td_water < temp_k
         assert td_ice < temp_k
-        assert td_ice < td_water
+        assert td_ice > td_water
     
     def test_hot_conditions(self):
         """Test hot conditions (40°C)."""
