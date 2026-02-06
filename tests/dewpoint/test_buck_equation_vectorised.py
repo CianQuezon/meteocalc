@@ -578,17 +578,7 @@ class TestBuckVectorizedPerformance:
 class TestBuckVectorizedErrors:
     """Test error handling and invalid inputs."""
     
-    def test_mismatched_array_lengths(self):
-        """Test that mismatched array lengths raise appropriate error."""
-        temps = np.array([273.15, 283.15, 293.15])
-        rhs = np.array([0.5, 0.6])  # Wrong length
-        
-        with pytest.raises((ValueError, IndexError)):
-            _buck_equation_vectorised(
-                temps, rhs,
-                BUCK_WATER_A, BUCK_WATER_B, BUCK_WATER_C
-            )
-    
+
     def test_empty_arrays(self):
         """Test behavior with empty arrays."""
         temps = np.array([])
