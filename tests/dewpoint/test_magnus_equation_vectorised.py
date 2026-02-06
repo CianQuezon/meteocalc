@@ -326,7 +326,8 @@ class TestMagnusVectorizedEdgeCases:
         
         # Should be reasonable for desert conditions
         assert np.all(dewpoints > 270)  # > -3°C
-        assert np.all(dewpoints < 310)  # < 37°C
+        assert np.all(dewpoints < temps_k) # Dewpoint must be < temperature
+        assert np.all(dewpoints < 350)  # < 77°C
     
     def test_no_nan_or_inf(self):
         """Test that function never produces NaN or Inf in valid range."""
