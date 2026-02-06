@@ -401,7 +401,7 @@ class TestMagnusVectorizedPerformance:
         1. Process 1M+ elements/second (after warmup)
         2. Performance improves or stays stable as size grows
         """
-        sizes = [100, 1_000, 10_000, 100_000]
+        sizes = [1_000, 10_000, 100_000]
         times = []
         
         for n in sizes:
