@@ -15,7 +15,6 @@ from meteocalc.shared._enum_tools import parse_enum
 from meteocalc.dewpoint._enums import DewPointEquationName
 from meteocalc.vapor._enums import SurfaceType
 from meteocalc.dewpoint._jit_equations import (
-    _buck_equation_scalar, _buck_equation_vectorised,
     _magnus_equation_scalar, _magnus_equation_vectorised
 )
 from meteocalc.dewpoint._dewpoint_constants import (
@@ -31,8 +30,6 @@ class DewPointEquation(ABC):
     name: DewPointEquationName
     temp_bounds: Tuple[float, float]
     surface_type: SurfaceType
-
-
 
     def __init__(self, surface_type: Union[str, SurfaceType]):       
         self.surface_type = parse_enum(value=surface_type, enum_class=SurfaceType)
@@ -61,10 +58,10 @@ class DewPointEquation(ABC):
         if temp_k.ndim == 0 and rh.ndim == 0:
             
             if equation_constant is not None:
-                return scalar_func(temp_k=temp_k, rh=rh, *equation_constant)
+                return scalar_func(temp_k, rh, *equation_constant)
             
             else: 
-                return scalar_func(temp_k=temp_k, rh=rh)
+                return scalar_func(temp_k, rh)
         
         else:
             temp_k_original_shape = temp_k.shape
@@ -115,38 +112,38 @@ class DewPointEquation(ABC):
         pass
 
 
-class BuckDewpointEquation(DewPointEquation):
+
+class MagnusDewpointEquation(DewPointEquation):
     """
-    Docstring for BuckDewpointEquation
+    Docstring for MagnusDewpointEquation
     """
-    name: DewPointEquationName = DewPointEquationName.BUCK
+    name: DewPointEquationName = DewPointEquationName.MAGNUS
 
     def _update_temp_bounds(self):
-        """"""
+        
         if self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (233.15, 273.15)
         
         elif self.surface_type == SurfaceType.WATER:
-            self.temp_bounds = (243.15, 323.15)
+            self.temp_bounds = (233.15, 333.15)
+    
+    def calculate(self, temp_k: Union[float, npt.ArrayLike], rh: Union[npt.ArrayLike, float]):
 
-    def calculate(self, temp_k: Union[npt.ArrayLike, float], rh: Union[npt.ArrayLike, float]) -> Union[float, npt.NDArray]:
-        """
-        Docstring for calculate
-        
-        :param self: Description
-        :param temp_k: Description
-        :type temp_k: Union[npt.ArrayLike, float]
-        :param rh: Description
-        :type rh: Union[npt.ArrayLike, float]
-        :return: Description
-        :rtype: float | NDArray
-        """
         if self.surface_type == SurfaceType.WATER:
             return self._dispatch_scalar_or_vector(
                 temp_k=temp_k,
-                scalar_func=_buck_equation_scalar,
-                vector_func=_buck_equation_vectorised,
-                equation_constant=BUCK_WATER
+                rh=rh,
+                scalar_func=_magnus_equation_scalar,
+                vector_func=_magnus_equation_vectorised,
+                equation_constant=MAGNUS_WATER
             )
-
-        return super().calculate(temp_k, rh)
+        
+        elif self.surface_type == SurfaceType.ICE:
+            return self._dispatch_scalar_or_vector(
+                temp_k=temp_k,
+                rh=rh,
+                scalar_func=_magnus_equation_scalar,
+                vector_func=_magnus_equation_vectorised,
+                equation_constant=MAGNUS_ICE
+            )
+        
