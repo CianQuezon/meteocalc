@@ -19,7 +19,6 @@ from meteocalc.dewpoint._jit_equations import (
 )
 from meteocalc.dewpoint._dewpoint_constants import (
     MAGNUS_ICE, MAGNUS_WATER,
-    BUCK_ICE, BUCK_WATER
 )
 
 
