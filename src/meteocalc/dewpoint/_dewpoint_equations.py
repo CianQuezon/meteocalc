@@ -185,35 +185,9 @@ class MagnusDewpointEquation(DewPointEquation):
                 equation_constant=MAGNUS_ICE
             )
         
-if __name__ == "__main__":
+class SolverDewpointMethod(DewPointEquation):
+    """
+    Docstring for SolverDewpointMethod
+    """
 
-    magnus = MagnusDewpointEquation(surface_type='water')
-
-    # Test with scalar RH, array temps (this is what's failing)
-    print("\nTesting through class interface:")
-    temps_c = np.linspace(0, 30, 20)
-    temps_k = temps_c + 273.15
-    rh = 0.6  # Scalar!
-
-    print(f"Input: temps.shape={temps_k.shape}, rh={rh}")
-
-    try:
-        td_k = magnus.calculate(temp_k=temps_k, rh=rh)
-        print(f"Output: td_k.shape={td_k.shape}")
         
-        td_c = td_k - 273.15
-        print(f"\nFirst 5 dew points: {td_c[:5]}")
-        print(f"Last 5 dew points: {td_c[-5:]}")
-        
-        # Check monotonicity
-        diffs = np.diff(td_c)
-        print(f"\nFirst 5 differences: {diffs[:5]}")
-        print(f"Min diff: {np.min(diffs)}")
-        print(f"Max diff: {np.max(diffs)}")
-        print(f"Any NaN? {np.any(np.isnan(td_c))}")
-        print(f"All positive? {np.all(diffs > 0)}")
-        
-    except Exception as e:
-        print(f"ERROR: {e}")
-        import traceback
-        traceback.print_exc()
