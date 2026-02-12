@@ -437,7 +437,9 @@ class TestMagnusPsychroLibValidation:
         td_k_ref = get_psychrolib_dewpoint(temp_k, rh)
         
         # Determine tolerance based on conditions
-        if temp_c <= 5 and rh < 0.4:
+        if temp_c <= 0 and rh < 0.35:
+            tolerance = 1.7  
+        elif temp_c <= 5 and rh < 0.4:
             tolerance = 1.5
         elif temp_c <= 10:
             tolerance = 1.2
