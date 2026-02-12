@@ -6,6 +6,7 @@ Docstring for meteocalc.dewpoint._dewpoint_equations
 from abc import ABC, abstractmethod
 
 from typing import Tuple, Union, NamedTuple, Optional, Callable
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -56,11 +57,14 @@ class DewPointEquation(ABC):
 
         if temp_k.ndim == 0 and rh.ndim == 0:
             
+            temp_k_scalar = float(temp_k.item())
+            rh_scalar = float(rh.item())
+
             if equation_constant is not None:
-                return scalar_func(temp_k, rh, *equation_constant)
+                return scalar_func(temp_k_scalar, rh_scalar, *equation_constant)
             
             else: 
-                return scalar_func(temp_k, rh)
+                return scalar_func(temp_k_scalar, rh_scalar)
         
         else:
             temp_k_original_shape = temp_k.shape
@@ -77,11 +81,11 @@ class DewPointEquation(ABC):
                     temp_k_flatten, rh_flatten
                 )
             return dewpoint_temp.reshape(temp_k_original_shape)
-            
-    def _broadcast_input(self, temp_k: Union[float, npt.ArrayLike], rh: Union[float, npt.ArrayLike]):
-        
-        temp_k = np.asarray(temp_k, dtype=np.float64)
-        rh = np.asarray(rh, dtype=np.float64)
+
+
+    def _broadcast_input(self, temp_k: Union[float, npt.ArrayLike], 
+                         rh: Union[float, npt.ArrayLike]) -> tuple[Union[float, npt.ArrayLike], Union[float, npt.ArrayLike]]:
+
 
         if temp_k.ndim == 0 and rh.ndim == 0:
             pass
@@ -97,6 +101,8 @@ class DewPointEquation(ABC):
                 f"Input arrays must have the same shape or one must be scalar. "
                 f"Got temp_k.shape ={temp_k.shape}, rh.shape={rh.shape}"
             )
+        
+        return temp_k, rh
 
     def _validate_input(self, temp_k: Union[float, npt.ArrayLike], rh: Union[float, npt.ArrayLike]):
         """
@@ -107,13 +113,28 @@ class DewPointEquation(ABC):
         :param rh: Description
         :type rh: Union[float, npt.ArrayLike]
         """
+        temp_k = np.asarray(temp_k, dtype=np.float64)
+        rh = np.asarray(rh, dtype=np.float64)
 
+        temp_k, rh = self._broadcast_input(temp_k=temp_k, rh=rh)
 
-        if rh.ndim != temp_k.ndim:
+        if np.any(rh < 0) or np.any(rh > 1):
             raise ValueError(
-                f"Input rh and temp_k must match."
+                f"Relative humidity must be in [0, 1] "
+                f"Got range [{np.min(rh)}, {np.max(rh)}]"
             )
         
+        temp_min, temp_max = self.temp_bounds
+
+        if np.any(temp_k < temp_min) or np.any(temp_k > temp_max):
+            warnings.warn(
+                f"Temperature outside valid range "
+                f"[{temp_min}K, {temp_max}K] "
+                f"for {self.name.value} with {self.surface_type.value} surface. "
+                f"Results may be inaccurate.",
+                UserWarning,
+                stacklevel=3           
+            )
         return temp_k, rh
 
     @abstractmethod
@@ -164,3 +185,35 @@ class MagnusDewpointEquation(DewPointEquation):
                 equation_constant=MAGNUS_ICE
             )
         
+if __name__ == "__main__":
+
+    magnus = MagnusDewpointEquation(surface_type='water')
+
+    # Test with scalar RH, array temps (this is what's failing)
+    print("\nTesting through class interface:")
+    temps_c = np.linspace(0, 30, 20)
+    temps_k = temps_c + 273.15
+    rh = 0.6  # Scalar!
+
+    print(f"Input: temps.shape={temps_k.shape}, rh={rh}")
+
+    try:
+        td_k = magnus.calculate(temp_k=temps_k, rh=rh)
+        print(f"Output: td_k.shape={td_k.shape}")
+        
+        td_c = td_k - 273.15
+        print(f"\nFirst 5 dew points: {td_c[:5]}")
+        print(f"Last 5 dew points: {td_c[-5:]}")
+        
+        # Check monotonicity
+        diffs = np.diff(td_c)
+        print(f"\nFirst 5 differences: {diffs[:5]}")
+        print(f"Min diff: {np.min(diffs)}")
+        print(f"Max diff: {np.max(diffs)}")
+        print(f"Any NaN? {np.any(np.isnan(td_c))}")
+        print(f"All positive? {np.all(diffs > 0)}")
+        
+    except Exception as e:
+        print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
