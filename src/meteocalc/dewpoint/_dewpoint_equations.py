@@ -78,6 +78,25 @@ class DewPointEquation(ABC):
                 )
             return dewpoint_temp.reshape(temp_k_original_shape)
             
+    def _broadcast_input(self, temp_k: Union[float, npt.ArrayLike], rh: Union[float, npt.ArrayLike]):
+        
+        temp_k = np.asarray(temp_k, dtype=np.float64)
+        rh = np.asarray(rh, dtype=np.float64)
+
+        if temp_k.ndim == 0 and rh.ndim == 0:
+            pass
+
+        elif temp_k.ndim == 0 and rh.ndim > 0:
+            temp_k = np.full_like(rh, temp_k, dtype=np.float64)
+        
+        elif rh.ndim == 0 and temp_k.ndim > 0:
+            rh = np.full_like(temp_k, rh, dtype=np.float64)
+        
+        elif temp_k.shape != rh.shape:
+            raise ValueError(
+                f"Input arrays must have the same shape or one must be scalar. "
+                f"Got temp_k.shape ={temp_k.shape}, rh.shape={rh.shape}"
+            )
 
     def _validate_input(self, temp_k: Union[float, npt.ArrayLike], rh: Union[float, npt.ArrayLike]):
         """
@@ -88,8 +107,7 @@ class DewPointEquation(ABC):
         :param rh: Description
         :type rh: Union[float, npt.ArrayLike]
         """
-        temp_k = np.asarray(temp_k, dtype=np.float64)
-        rh = np.asarray(rh, dtype=np.float64)
+
 
         if rh.ndim != temp_k.ndim:
             raise ValueError(
