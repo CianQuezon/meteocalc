@@ -9,7 +9,7 @@ class DewPointEquationName(Enum):
     Docstring for EquationName
     """
     MAGNUS = "magnus"
-    BUCK = "buck"
+    VAPOR_INVERSION = "vapor_inversioin"
 
 class CalculationMethod(Enum):
     """
