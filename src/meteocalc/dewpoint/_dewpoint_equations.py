@@ -13,11 +13,14 @@ import numpy.typing as npt
 
 
 from meteocalc.shared._enum_tools import parse_enum
-from meteocalc.dewpoint._enums import DewPointEquationName
-from meteocalc.vapor._enums import SurfaceType
+from meteocalc.dewpoint._enums import DewPointEquationName, CalculationMethod
+from meteocalc.vapor._enums import SurfaceType, EquationName
+from meteocalc.vapor._vapor_equations import VaporEquation
+from meteocalc.vapor import Vapor
 from meteocalc.dewpoint._jit_equations import (
     _magnus_equation_scalar, _magnus_equation_vectorised
 )
+from meteocalc.dewpoint._solver_method import get_dewpoint_using_solver
 from meteocalc.dewpoint._dewpoint_constants import (
     MAGNUS_ICE, MAGNUS_WATER,
 )
@@ -30,6 +33,7 @@ class DewPointEquation(ABC):
     name: DewPointEquationName
     temp_bounds: Tuple[float, float]
     surface_type: SurfaceType
+    calculation_method: CalculationMethod
 
     def __init__(self, surface_type: Union[str, SurfaceType]):       
         self.surface_type = parse_enum(value=surface_type, enum_class=SurfaceType)
@@ -136,6 +140,9 @@ class DewPointEquation(ABC):
                 stacklevel=3           
             )
         return temp_k, rh
+    
+    def get_calculation_method(self) -> CalculationMethod:
+        return self.calculation_method
 
     @abstractmethod
     def _update_temp_bounds(self) -> None:
@@ -156,6 +163,7 @@ class MagnusDewpointEquation(DewPointEquation):
     Docstring for MagnusDewpointEquation
     """
     name: DewPointEquationName = DewPointEquationName.MAGNUS
+    calculation_method: CalculationMethod = CalculationMethod.APPROXIMATION
 
     def _update_temp_bounds(self):
         
@@ -185,9 +193,32 @@ class MagnusDewpointEquation(DewPointEquation):
                 equation_constant=MAGNUS_ICE
             )
         
-class SolverDewpointMethod(DewPointEquation):
+class VaporInversionDewpoint(DewPointEquation):
     """
     Docstring for SolverDewpointMethod
     """
+    name: DewPointEquationName = DewPointEquationName.VAPOR_INVERSION
+    calculation_method: CalculationMethod = CalculationMethod.SOLVER
+    vapor_equation: EquationName
 
+
+    def __init__(self, surface_type: SurfaceType, vapor_equation_name: Union[EquationName, str]):
+        self.surface_type = parse_enum(value=surface_type, enum_class=SurfaceType)
+        self.vapor_equation = parse_enum(value=vapor_equation_name, enum_class=EquationName)
+        self._update_temp_bounds()
+
+    def _update_temp_bounds(self):
+        vapor_equation = Vapor.get_equation(equation=self.vapor_equation, phase=self.surface_type)
+        self.temp_bounds = vapor_equation.get_temp_bounds()
+
+    def calculate(self, temp_k: Union[npt.ArrayLike, float], rh: Union[npt.ArrayLike, float]) ->  Union[npt.NDArray, float]:
         
+        temp_k, rh = self._validate_input(temp_k=temp_k, rh=rh)
+        
+        dewpoint, _, _ = get_dewpoint_using_solver(
+            temp_k=temp_k, 
+            rh=rh,
+            surface_type=self.surface_type,
+            vapor_equation=self.vapor_equation
+        )
+        return dewpoint
