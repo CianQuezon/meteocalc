@@ -1,5 +1,7 @@
 """
-Docstring for meteocalc.dewpoint._dewpoint_constants
+Named tuple dewpoint constants.
+
+Author: Cian Quezon
 """
 
 
@@ -7,7 +9,20 @@ from typing import NamedTuple
 
 class MagnusDewpointConstants(NamedTuple):
     """
-    Docstring for MagnusConstants
+    Magnus-Tetens equation coefficients for dew/frost point calculation.
+    
+    Named tuple containing the empirical coefficients A and B used in the
+    Magnus-Tetens approximation formula. Different coefficients are used
+    for water and ice surfaces to account for different vapor pressure
+    characteristics.
+    
+    Attributes
+    ----------
+    A : float
+        Dimensionless coefficient in Magnus formula
+
+    B : float
+        Temperature coefficient in Celsius
     """
     A: float
     B: float
