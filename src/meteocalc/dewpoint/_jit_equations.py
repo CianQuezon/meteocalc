@@ -1,5 +1,7 @@
 """
-Docstring for meteocalc.dewpoint._jit_equations
+Jit equation for approximation equations.
+
+Author: Cian Quezon
 """
 import numpy as np
 import numpy.typing as npt
@@ -10,18 +12,32 @@ from numba import njit, prange
 def _magnus_equation_scalar(temp_k: float, rh: float, 
                             A: float, B: float) -> float:
     """
-    Docstring for _magnus_equation_scalar
+    Scalar Magnus-Tetens formula for dew point calculation.
     
-    :param temp_k: Description
-    :type temp_k: float
-    :param rh: Description
-    :type rh: float
-    :param A: Description
-    :type A: float
-    :param B: Description
-    :type B: float
-    :return: Description
-    :rtype: float
+    Calculates dew point temperature for a single temperature-humidity pair
+    using the Magnus-Tetens approximation formula. JIT-compiled with Numba
+    for high performance.
+    
+    Parameters
+    ----------
+    temp_k : float
+        Air temperature in Kelvin
+    rh : float
+        Relative humidity as fraction (0-1, not percentage)
+    A : float
+        Magnus equation coefficient A
+    B : float
+        Magnus equation coefficient B in Celsius
+    
+    Returns
+    -------
+    float
+        Dew/frost point temperature in Kelvin
+    
+    See Also
+    --------
+    _magnus_equation_vectorised : Parallel version for arrays
+    MagnusDewpointEquation : High-level interface
     """
 
     temp_c = temp_k - 273.15
@@ -35,18 +51,32 @@ def _magnus_equation_scalar(temp_k: float, rh: float,
 def _magnus_equation_vectorised(temp_k: npt.ArrayLike, rh: npt.ArrayLike,
                                 A: float, B: float) -> npt.NDArray:
     """
-    Docstring for _magnus_equation_vectorised
+    Vectorized Magnus formula for dew point calculation with parallel processing.
     
-    :param temp_k: Description
-    :type temp_k: npt.ArrayLike
-    :param rh: Description
-    :type rh: npt.ArrayLike
-    :param A: Description
-    :type A: float
-    :param B: Description
-    :type B: float
-    :return: Description
-    :rtype: NDArray
+    Calculates dew point temperatures for arrays of temperature and humidity
+    values using the Magnus-Tetens approximation formula. Optimized with
+    Numba JIT compilation and parallel processing via prange.
+    
+    Parameters
+    ----------
+    temp_k : ndarray
+        Air temperature(s) in Kelvin, shape (n,)
+    rh : ndarray
+        Relative humidity(ies) as fraction (0-1), shape (n,)
+    A : float
+        Magnus equation coefficient A
+    B : float
+        Magnus equation coefficient B (Celsius)
+    
+    Returns
+    -------
+    ndarray
+        Dew/frost point temperature(s) in Kelvin, shape (n,)
+    
+    See Also
+    --------
+    _magnus_equation_scalar : Scalar version for single calculations
+    MagnusDewpointEquation : High-level interface
     """
 
     n = len(temp_k)
