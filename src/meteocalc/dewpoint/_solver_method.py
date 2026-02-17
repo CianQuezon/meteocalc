@@ -18,8 +18,8 @@ import numpy as np
 
 
 
-def get_dewpoint_using_solver(temp_k: Union[float, npt.ArrayLike], rh: Union[npt.ArrayLike],
-                              surface_type: Union[str, SurfaceType], vapor_equation: Union[str, EquationName] = 'goff_gratch') -> Union[float, npt.NDArray]:
+def get_dewpoint_using_solver(temp_k: Union[float, npt.ArrayLike], rh: Union[float, npt.ArrayLike],
+                              surface_type: Union[str, SurfaceType], vapor_equation: Union[str, EquationName] = 'goff_gratch') -> Union[tuple[float, int, bool], tuple[npt.NDArray, npt.NDArray, npt.NDArray]]:
     """
     Calculate exact dew/frost point using numerical root finding.
     
