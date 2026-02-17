@@ -293,7 +293,7 @@ class TestInputValidation:
     
     def test_invalid_equation_raises(self):
         """Invalid equation name should raise ValueError."""
-        with pytest.raises(ValueError, match="not a valid approximation"):
+        with pytest.raises(ValueError, match="Invalid enum"):
             Dewpoint.get_frostpoint_approximation(
                 263.15, 0.7, frostpoint_equation_name='invalid'
             )
