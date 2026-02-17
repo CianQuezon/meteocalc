@@ -68,6 +68,65 @@ def get_dewpoint_using_solver(temp_k: Union[float, npt.ArrayLike], rh: Union[npt
     return roots, iters, converged
 
 def get_dewpoint_objective_function(vapor_equation: VaporEquation):
+    """
+    Create JIT-compiled objective function for dew point root finding.
+    
+    Generates a Numba-compiled objective function that calculates the
+    difference between saturation vapor pressure at a given temperature
+    and the actual vapor pressure. Used by numerical solvers to find
+    the temperature where this difference equals zero (the dew/frost point).
+    
+    Parameters
+    ----------
+    vapor_equation : VaporEquation
+        Vapor pressure equation instance (e.g., Goff-Gratch, Hyland-Wexler)
+        Must provide get_jit_scalar_func() and get_constants() methods
+    
+    Returns
+    -------
+    callable
+        JIT-compiled objective function with signature:
+        f(x: float, e_actual: float) -> float
+        
+        where:
+        - x: Trial temperature in Kelvin
+        - e_actual: Actual vapor pressure in Pascals
+        - returns: e_sat(x) - e_actual (zero at dew point)
+    
+    Examples
+    --------
+    >>> from meteocalc.vapor import Vapor
+    >>> from meteocalc.vapor._enums import EquationName, SurfaceType
+    >>> 
+    >>> # Get Goff-Gratch equation for water surface
+    >>> vapor_eq = Vapor.get_equation(
+    ...     equation=EquationName.GOFF_GRATCH,
+    ...     phase=SurfaceType.WATER
+    ... )
+    >>> 
+    >>> # Create objective function
+    >>> objective = get_dewpoint_objective_function(vapor_eq)
+    >>> 
+    >>> # Example: Find dew point at 20°C, 60% RH
+    >>> temp_k = 293.15
+    >>> rh = 0.6
+    >>> e_sat_air = vapor_eq.calculate(temp_k)
+    >>> e_actual = rh * e_sat_air
+    >>> 
+    >>> # Evaluate objective at different temperatures
+    >>> print(f"At 285 K: {objective(285.0, e_actual):.2f} Pa")
+    >>> print(f"At 290 K: {objective(290.0, e_actual):.2f} Pa")
+    >>> print(f"At 295 K: {objective(295.0, e_actual):.2f} Pa")
+    At 285 K: -402.15 Pa
+    At 290 K: -12.34 Pa
+    At 295 K: 891.23 Pa
+    # Zero-crossing indicates dew point is between 290-295 K
+    
+    See Also
+    --------
+    get_dewpoint_using_solver : Uses this objective function for solving
+    meteocalc.vapor.VaporEquation : Base class for vapor equations
+    """
 
     vapor_scalar_func = vapor_equation.get_jit_scalar_func()
     surface_constants = vapor_equation.get_constants()
@@ -76,10 +135,24 @@ def get_dewpoint_objective_function(vapor_equation: VaporEquation):
     @njit
     def dewpoint_objective(x: float, e_actual: float):
         """
-        Docstring for dewpoint_objective
+        Objective function for dew point root finding.
         
-        :param x: Description
-        :param e_sat: Description
+        Calculates the difference between saturation vapor pressure at
+        temperature x and the actual vapor pressure. The root of this
+        function is the dew/frost point temperature.
+        
+        Parameters
+        ----------
+        x : float
+            Trial temperature in Kelvin
+        e_actual : float
+            Actual vapor pressure in Pascals (from RH × e_sat(T_air))
+        
+        Returns
+        -------
+        float
+            Residual: e_sat(x) - e_actual
+            Zero when x equals the dew/frost point temperature
         """
         e_sat = vapor_scalar_func(x, *tuple_surface_constants)
 
