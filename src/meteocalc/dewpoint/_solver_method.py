@@ -1,5 +1,7 @@
 """
-Docstring for meteocalc.dewpoint._solver_method
+Calculates the dewpoint using solver inversion method.
+
+Author: Cian Quezon
 """
 
 from rapid_roots.solvers import RootSolvers
@@ -19,18 +21,83 @@ import numpy as np
 def get_dewpoint_using_solver(temp_k: Union[float, npt.ArrayLike], rh: Union[npt.ArrayLike],
                               surface_type: Union[str, SurfaceType], vapor_equation: Union[str, EquationName] = 'goff_gratch') -> Union[float, npt.NDArray]:
     """
-    Docstring for get_dewpoint_using_solver
-
-    :param temp_k: Description
-    :type temp_k: Union[float, npt.ArrayLike]
-    :param rh: Description
-    :type rh: Union[npt.ArrayLike]
-    :param vapor_equation: Description
-    :type vapor_equation: Union[str, EquationName]
-    :param surface_type: Description
-    :type surface_type: Union[str, SurfaceType]
-    :return: Description
-    :rtype: float | NDArray
+    Calculate exact dew/frost point using numerical root finding.
+    
+    Numerically inverts vapor pressure equations to find the exact temperature
+    at which air becomes saturated. Uses RapidRoots with Brent's method and
+    automatic fallback to bisection for guaranteed convergence.
+    
+    This is the core numerical solver used by VaporInversionDewpoint class.
+    
+    Parameters
+    ----------
+    temp_k : float or array
+        Air temperature(s) in Kelvin
+    rh : float or array
+        Relative humidity(ies) as fraction (0-1, not percentage)
+    surface_type : str or SurfaceType
+        Surface type for saturation:
+        - 'water': Calculate dew point (liquid water surface)
+        - 'ice': Calculate frost point (ice surface)
+    vapor_equation : str or EquationName, default 'goff_gratch'
+        Vapor pressure equation to invert:
+        - 'goff_gratch': WMO standard (recommended)
+        - 'hyland_wexler': ASHRAE standard
+        - 'bolton': Meteorological standard
+    
+    Returns
+    -------
+    roots : float or ndarray
+        Dew/frost point temperature(s) in Kelvin
+    iters : int or ndarray
+        Number of iterations taken for convergence
+    converged : bool or ndarray
+        Convergence status (True if converged)
+    
+    Examples
+    --------
+    >>> # Single calculation (dew point)
+    >>> td, iters, converged = get_dewpoint_using_solver(
+    ...     temp_k=293.15,
+    ...     rh=0.6,
+    ...     surface_type='water',
+    ...     vapor_equation='goff_gratch'
+    ... )
+    >>> print(f"Dew point: {td - 273.15:.4f}°C")
+    >>> print(f"Iterations: {iters}, Converged: {converged}")
+    Dew point: 12.0077°C
+    Iterations: 7, Converged: True
+    
+    >>> # Array calculation (frost point)
+    >>> import numpy as np
+    >>> temps = np.array([253.15, 263.15, 268.15])
+    >>> rhs = np.array([0.5, 0.7, 0.9])
+    >>> tfs, iters, converged = get_dewpoint_using_solver(
+    ...     temp_k=temps,
+    ...     rh=rhs,
+    ...     surface_type='ice',
+    ...     vapor_equation='goff_gratch'
+    ... )
+    >>> print(tfs - 273.15)
+    >>> print(f"All converged: {np.all(converged)}")
+    [-28.35 -13.96  -6.05]
+    All converged: True
+    
+    >>> # Different vapor equation
+    >>> td, _, _ = get_dewpoint_using_solver(
+    ...     temp_k=293.15,
+    ...     rh=0.6,
+    ...     surface_type='water',
+    ...     vapor_equation='hyland_wexler'
+    ... )
+    >>> print(f"{td - 273.15:.4f}°C")
+    12.0075°C
+    
+    See Also
+    --------
+    VaporInversionDewpoint : High-level interface using this solver
+    get_dewpoint_objective_function : Creates the objective function
+    meteocalc.rapid_roots.RootSolvers : Numerical solver backend
     """
     was_scalar = np.ndim(temp_k) == 0 and np.ndim(rh) == 0
 
