@@ -82,7 +82,7 @@ Issues = "https://github.com/CianQuezon/meteocalc/issues"
 Changelog = "https://github.com/CianQuezon/meteocalc/releases"
 
 [tool.setuptools]
-packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor"]
+packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor", "meteocalc.dewpoint"]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
