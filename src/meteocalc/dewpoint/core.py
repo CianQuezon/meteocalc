@@ -375,12 +375,10 @@ class Dewpoint:
         get_dewpoint_approximation : Fast approximation (~100x faster)
         get_frostpoint_solver : Frost point (ice surface)
         """
-        vapor_equation = parse_enum(value=vapor_equation_name, enum_class=EquationName)
+        vapor_equation_name = parse_enum(value=vapor_equation_name, enum_class=EquationName)
    
         dewpoint_solver = VaporInversionDewpoint(surface_type='water', vapor_equation_name=vapor_equation_name)        
-        dewpoints = dewpoint_solver.calculate(temp_k=temp_k, rh=rh)
-
-        return dewpoints
+        return dewpoint_solver.calculate(temp_k=temp_k, rh=rh)
         
 
     @staticmethod
