@@ -14,9 +14,9 @@ from enum import Enum
 class SurfaceType(Enum):
     """
     Surface type for vapor pressure calculations.
-    
+
     Different equations use different constants depending on surface types.
-    
+
     Attributes
     ----------
     AUTOMATIC : str
@@ -35,7 +35,7 @@ class SurfaceType(Enum):
 class EquationName(Enum):
     """
     Available saturation vapor pressure equation types.
-    
+
     Attributes
     ----------
     BOLTON : str

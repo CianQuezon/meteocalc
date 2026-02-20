@@ -260,22 +260,22 @@ class VaporEquation(ABC):
         ranges for the specific equation.
         """
         pass
-    
+
     def get_jit_scalar_func(self) -> Callable[[float], float]:
         """
         Get the JIT-compiled scalar function for this vapor pressure equation.
-        
+
         Returns the Numba JIT-compiled scalar function that calculates saturation
         vapor pressure for a single temperature value. This function is optimized
         for performance and is used internally by the solver for root-finding
         operations.
-        
+
         Returns
         -------
         callable
             JIT-compiled scalar function with signature:
             f(temp_k: float, *constants) -> float
-            
+
             where:
             - temp_k: Temperature in Kelvin
             - constants: Equation-specific constants (optional)
@@ -285,109 +285,109 @@ class VaporEquation(ABC):
         --------
         >>> from meteocalc.vapor import Vapor
         >>> from meteocalc.vapor._enums import EquationName, SurfaceType
-        >>> 
+        >>>
         >>> # Get Goff-Gratch equation
         >>> vapor_eq = Vapor.get_equation(
         ...     equation=EquationName.GOFF_GRATCH,
         ...     phase=SurfaceType.WATER
         ... )
-        >>> 
+        >>>
         >>> # Get the JIT-compiled scalar function
         >>> scalar_func = vapor_eq.get_jit_scalar_func()
-        >>> 
-        >>> # Use it directly 
+        >>>
+        >>> # Use it directly
         >>> temp_k = 293.15  # 20°C
         >>> constants = vapor_eq.get_constants()
         >>> e_sat = scalar_func(temp_k, *constants)
         >>> print(f"Saturation vapor pressure: {e_sat:.2f} hPa")
         Saturation vapor pressure: 23.37 hPa
-        
+
         See Also
         --------
         get_constants : Get equation-specific constants
         calculate : High-level interface for vapor pressure calculation
         """
         return self.jit_function
-    
+
     def get_temp_bounds(self):
         """
         Get the valid temperature range for this vapor pressure equation.
-        
+
         Returns the minimum and maximum temperatures (in Kelvin) for which
         this equation is valid. Temperatures outside this range may produce
         inaccurate results and will trigger warnings.
-        
+
         Returns
         -------
         tuple of float
             Valid temperature range as (min_temp, max_temp) in Kelvin
-        
+
         Examples
         --------
         >>> from meteocalc.vapor import Vapor
         >>> from meteocalc.vapor._enums import EquationName, SurfaceType
-        >>> 
+        >>>
         >>> # Get Goff-Gratch equation for water
         >>> vapor_eq = Vapor.get_equation(
         ...     equation=EquationName.GOFF_GRATCH,
         ...     phase=SurfaceType.WATER
         ... )
-        >>> 
+        >>>
         >>> # Get temperature bounds
         >>> min_temp, max_temp = vapor_eq.get_temp_bounds()
         >>> print(f"Valid range: {min_temp:.2f}K to {max_temp:.2f}K")
         >>> print(f"             {min_temp-273.15:.2f}°C to {max_temp-273.15:.2f}°C")
         Valid range: 273.15K to 373.15K
                     0.00°C to 100.00°C
-        
+
         >>> # Check if temperature is in valid range
         >>> temp_k = 293.15
         >>> if min_temp <= temp_k <= max_temp:
         ...     print("Temperature is valid")
         Temperature is valid
-        
+
         See Also
         --------
         _update_temp_bounds : Abstract method that sets these bounds
         calculate : Uses these bounds to validate input temperatures
         """
         return self.temp_bounds
-    
+
     @abstractmethod
     def get_constants(self):
         """
         Get equation-specific constants for the current surface type.
-        
+
         Returns the named tuple containing equation-specific constants
         (coefficients) used in vapor pressure calculations. The constants
         differ depending on whether calculations are for water or ice surfaces.
-        
+
         Returns
         -------
         NamedTuple or None
-        
+
         Examples
         --------
         >>> from meteocalc.vapor import Vapor
         >>> from meteocalc.vapor._enums import EquationName, SurfaceType
-        >>> 
+        >>>
         >>> # Get Goff-Gratch equation for water
         >>> vapor_eq = Vapor.get_equation(
         ...     equation=EquationName.GOFF_GRATCH,
         ...     phase=SurfaceType.WATER
         ... )
-        >>> 
+        >>>
         >>> # Get constants
         >>> constants = vapor_eq.get_constants()
         >>> print(f"Number of constants: {len(constants)}")
         >>> print(f"Constants: {constants}")
         Number of constants: 7
         Constants: GoffGratchWaterConstants(...)
-        
+
         >>> # Use with JIT function
         >>> scalar_func = vapor_eq.get_jit_scalar_func()
         >>> e_sat = scalar_func(293.15, *constants)
-        
+
         >>> # Bolton returns None
         >>> bolton = Vapor.get_equation(
         ...     equation=EquationName.BOLTON,
@@ -395,7 +395,7 @@ class VaporEquation(ABC):
         ... )
         >>> print(bolton.get_constants())
         None
-        
+
         See Also
         --------
         get_jit_scalar_func : Get the JIT-compiled function that uses these constants
@@ -461,6 +461,7 @@ class BoltonEquation(VaporEquation):
     Bolton's equation is: es = 6.112 * exp((17.67 * T_c) / (T_c + 243.5))
     where T_c is temperature in Celsius and es is in hPa.
     """
+
     name: EquationName = EquationName.BOLTON
     jit_function: Callable[[float], float] = _bolton_scalar
 
@@ -478,11 +479,9 @@ class BoltonEquation(VaporEquation):
         self.temp_bounds = (243.15, 313.15)
 
     def get_constants(self):
-        warnings.warn(
-            f"Bolton only has water constants."
-        )
+        warnings.warn("Bolton only has water constants.", stacklevel=2)
         return None
-    
+
     def calculate(
         self, temp_k: Union[npt.ArrayLike, float]
     ) -> Union[npt.NDArray, np.float64]:
@@ -636,7 +635,6 @@ class HylandWexlerEquation(VaporEquation):
     >>> vapor_pressures = hyland.calculate(temps)
     """
 
-
     name: EquationName = EquationName.HYLAND_WEXLER
     jit_function: Callable[[float], float] = _hyland_wexler_scalar
 
@@ -647,8 +645,8 @@ class HylandWexlerEquation(VaporEquation):
             self.temp_bounds = (273.15, 473.15)
         elif self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (173.15, 273.16)
-    
-    def get_constants(self):        
+
+    def get_constants(self):
         if self.surface_type == SurfaceType.WATER:
             return HYLAND_WEXLER_WATER
         elif self.surface_type == SurfaceType.ICE:
@@ -685,6 +683,7 @@ class HylandWexlerEquation(VaporEquation):
                 equation_constant=HYLAND_WEXLER_ICE,
             )
 
+
 if __name__ == "__main__":
-    hyland = HylandWexlerEquation(surface_type='water')
+    hyland = HylandWexlerEquation(surface_type="water")
     print(hyland.get_constants())

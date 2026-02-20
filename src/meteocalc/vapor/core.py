@@ -27,43 +27,44 @@ EQUATION_REGISTRY = {
 
 class Vapor:
     """User interface for saturation vapor pressure calculations.
-    
+
     This class provides static methods for listing available equations,
     selecting specific equation implementations, and calculating saturation
     vapor pressure.
-    
+
     Examples
     --------
     >>> # List available equations
     >>> Vapor.list_equations()
     ['bolton', 'goff_gratch', 'hyland_wexler']
-    
+
     >>> # Quick calculation using default (Goff-Gratch)
     >>> temp = 293.15  # 20°C in Kelvin
     >>> vapor_pressure = Vapor.get_vapor_saturation(temp)
-    
+
     >>> # Calculate with specific equation and surface type
     >>> temps = np.array([263.15, 273.15, 283.15])
     >>> vapor_pressures = Vapor.get_vapor_saturation(
-    ...     temps, 
+    ...     temps,
     ...     equation='hyland_wexler',
     ...     phase='water'
     ... )
-    
+
     >>> # Get equation instance for repeated calculations
     >>> bolton = Vapor.get_equation('bolton')
     >>> result1 = bolton.calculate(293.15)
     >>> result2 = bolton.calculate(298.15)
     """
+
     @staticmethod
     def list_equations() -> List[str]:
         """List all available saturation vapor pressure equations.
-        
+
         Returns
         -------
         list of str
             Names of available equations: 'bolton', 'goff_gratch', 'hyland_wexler'.
-        
+
         Examples
         --------
         >>> equations = Vapor.list_equations()
@@ -78,10 +79,10 @@ class Vapor:
         phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC,
     ) -> VaporEquation:
         """Get a specific saturation vapor pressure equation instance.
-        
+
         Useful when you need to perform multiple calculations with the same
         equation configuration.
-        
+
         Parameters
         ----------
         equation : str or EquationName
@@ -94,24 +95,24 @@ class Vapor:
             - 'automatic': Auto-selects ice/water based on temperature
             - 'water': Over liquid water
             - 'ice': Over ice
-        
+
         Returns
         -------
         VaporEquation
             Instance of the requested equation class.
-        
+
         Raises
         ------
         ValueError
             If equation name is invalid or incompatible phase is requested
             (e.g., 'ice' with Bolton equation).
-        
+
         Examples
         --------
         >>> # Get Goff-Gratch equation with automatic phase detection
         >>> goff = Vapor.get_equation('goff_gratch', phase='automatic')
         >>> vapor_pressure = goff.calculate(273.15)
-        
+
         >>> # Get Bolton equation (only supports water)
         >>> bolton = Vapor.get_equation('bolton')
         >>> result = bolton.calculate(293.15)
@@ -130,11 +131,11 @@ class Vapor:
         equation: Union[EquationName, str] = EquationName.GOFF_GRATCH,
     ) -> Union[np.ndarray, float]:
         """Calculate saturation vapor pressure at given temperature(s).
-        
+
         This is the primary method for calculating saturation vapor pressure.
         By default, it uses the Goff-Gratch equation with automatic surface
         type detection.
-        
+
         Parameters
         ----------
         temp_k : float or array_like
@@ -149,40 +150,40 @@ class Vapor:
             - 'bolton': Fast, simple (water only, limited range)
             - 'goff_gratch': WMO standard, high accuracy
             - 'hyland_wexler': Wide temperature range
-        
+
         Returns
         -------
         float or ndarray
             Saturation vapor pressure in hectoPascals (hPa). Returns same
             shape as input temperature.
-        
+
         Raises
         ------
         ValueError
             If invalid equation or phase is specified.
-        
+
         Warnings
         --------
         UserWarning
             If temperature is outside the valid range for the selected equation.
-        
+
         Examples
         --------
         >>> # Single temperature calculation
         >>> temp = 293.15  # 20°C
         >>> es = Vapor.get_vapor_saturation(temp)
-        
+
         >>> # Array of temperatures with automatic phase detection
         >>> temps = np.array([263.15, 273.15, 283.15])  # -10°C, 0°C, 10°C
         >>> es_array = Vapor.get_vapor_saturation(temps)
-        
+
         >>> # Specify equation and phase explicitly
         >>> es = Vapor.get_vapor_saturation(
         ...     temp_k=298.15,
         ...     equation='hyland_wexler',
         ...     phase='water'
         ... )
-        
+
         >>> # Calculate over ice surface only
         >>> temp_ice = 263.15  # -10°C
         >>> es_ice = Vapor.get_vapor_saturation(
@@ -190,7 +191,7 @@ class Vapor:
         ...     phase='ice',
         ...     equation='goff_gratch'
         ... )
-        
+
         Notes
         -----
         The Goff-Gratch equation is recommended for most meteorological
