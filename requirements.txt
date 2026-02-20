@@ -10,7 +10,7 @@ iniconfig==2.3.0
 kiwisolver==1.4.9
 llvmlite==0.46.0
 matplotlib==3.10.8
--e git+ssh://git@github.com/CianQuezon/meteocalc.git@8a4b446cbe98f335d32eca949ff0a64513591155#egg=meteocalc
+git+ssh://git@github.com/CianQuezon/meteocalc.git@8a4b446cbe98f335d32eca949ff0a64513591155#egg=meteocalc
 MetPy==1.7.1
 numba==0.63.1
 numpy==2.3.5
