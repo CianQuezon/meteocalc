@@ -13,10 +13,10 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from meteorological_equations.vapor._enums import SurfaceType
+from meteocalc.vapor._enums import SurfaceType
 
 # Import the equations to test
-from meteorological_equations.vapor._vapor_equations import (
+from meteocalc.vapor._vapor_equations import (
     BoltonEquation,
     GoffGratchEquation,
     HylandWexlerEquation,

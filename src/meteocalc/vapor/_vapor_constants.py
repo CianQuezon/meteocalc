@@ -92,7 +92,6 @@ class HylandWexlerConstants(NamedTuple):
         Coefficient for ln(T) term [dimensionless].
     """
 
-
     A: float
     B: float
     C: float

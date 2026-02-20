@@ -82,15 +82,15 @@ Issues = "https://github.com/CianQuezon/meteocalc/issues"
 Changelog = "https://github.com/CianQuezon/meteocalc/releases"
 
 [tool.setuptools]
-packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor"]
-packages_dir = {"" = "src"}
+packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor", "meteocalc.dewpoint"]
+package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
 meteocalc = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["*_test.py", "test_*".py]
+python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_"]
 addopts = [
     "-v",
@@ -102,7 +102,7 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "unit: marks tests as unit tests",
-    "integration: marks tests as integration tests", 
+    "integration: marks tests as integration tests" 
 ]
 
 [tool.coverage.report]
