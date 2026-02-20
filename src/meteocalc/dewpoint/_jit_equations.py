@@ -3,21 +3,21 @@ Jit equation for approximation equations.
 
 Author: Cian Quezon
 """
+
 import numpy as np
 import numpy.typing as npt
-
 from numba import njit, prange
 
+
 @njit
-def _magnus_equation_scalar(temp_k: float, rh: float, 
-                            A: float, B: float) -> float:
+def _magnus_equation_scalar(temp_k: float, rh: float, A: float, B: float) -> float:
     """
     Scalar Magnus-Tetens formula for dew point calculation.
-    
+
     Calculates dew point temperature for a single temperature-humidity pair
     using the Magnus-Tetens approximation formula. JIT-compiled with Numba
     for high performance.
-    
+
     Parameters
     ----------
     temp_k : float
@@ -28,12 +28,12 @@ def _magnus_equation_scalar(temp_k: float, rh: float,
         Magnus equation coefficient A
     B : float
         Magnus equation coefficient B in Celsius
-    
+
     Returns
     -------
     float
         Dew/frost point temperature in Kelvin
-    
+
     See Also
     --------
     _magnus_equation_vectorised : Parallel version for arrays
@@ -47,16 +47,18 @@ def _magnus_equation_scalar(temp_k: float, rh: float,
 
     return td_c + 273.15
 
+
 @njit(parallel=True, fastmath=True)
-def _magnus_equation_vectorised(temp_k: npt.ArrayLike, rh: npt.ArrayLike,
-                                A: float, B: float) -> npt.NDArray:
+def _magnus_equation_vectorised(
+    temp_k: npt.ArrayLike, rh: npt.ArrayLike, A: float, B: float
+) -> npt.NDArray:
     """
     Vectorized Magnus formula for dew point calculation with parallel processing.
-    
+
     Calculates dew point temperatures for arrays of temperature and humidity
     values using the Magnus-Tetens approximation formula. Optimized with
     Numba JIT compilation and parallel processing via prange.
-    
+
     Parameters
     ----------
     temp_k : ndarray
@@ -67,12 +69,12 @@ def _magnus_equation_vectorised(temp_k: npt.ArrayLike, rh: npt.ArrayLike,
         Magnus equation coefficient A
     B : float
         Magnus equation coefficient B (Celsius)
-    
+
     Returns
     -------
     ndarray
         Dew/frost point temperature(s) in Kelvin, shape (n,)
-    
+
     See Also
     --------
     _magnus_equation_scalar : Scalar version for single calculations
