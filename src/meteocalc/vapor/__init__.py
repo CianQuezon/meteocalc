@@ -1,4 +1,5 @@
 from meteocalc.shared._shared_enums import SurfaceType
+
 from ._enums import VaporEquationName
 from ._vapor_equations import (
     BoltonEquation,

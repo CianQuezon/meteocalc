@@ -12,8 +12,8 @@ import numpy as np
 from meteocalc.shared._enum_tools import parse_enum
 from meteocalc.shared._shared_enums import SurfaceType
 from meteocalc.vapor._enums import VaporEquationName
-from meteocalc.vapor._vapor_equations import VaporEquation
 from meteocalc.vapor._types import EQUATION_REGISTRY
+from meteocalc.vapor._vapor_equations import VaporEquation
 
 
 class Vapor:
