@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from meteocalc.vapor._enums import SurfaceType
+from meteocalc.shared._shared_enums import SurfaceType
 
 # Import the equations to test
 from meteocalc.vapor._vapor_equations import (
