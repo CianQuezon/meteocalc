@@ -6,6 +6,7 @@ Author: Cian Quezon
 
 from enum import Enum
 
+
 class SurfaceType(Enum):
     """
     Surface type for vapor pressure calculations.
