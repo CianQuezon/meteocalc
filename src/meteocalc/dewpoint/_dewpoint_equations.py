@@ -24,8 +24,9 @@ from meteocalc.dewpoint._jit_equations import (
 )
 from meteocalc.dewpoint._solver_method import get_dewpoint_using_solver
 from meteocalc.shared._enum_tools import parse_enum
+from meteocalc.shared._shared_enums import SurfaceType
 from meteocalc.vapor import Vapor
-from meteocalc.vapor._enums import EquationName, SurfaceType
+from meteocalc.vapor._enums import VaporEquationName
 
 
 class DewPointEquation(ABC):
@@ -673,14 +674,16 @@ class VaporInversionDewpoint(DewPointEquation):
 
     name: DewPointEquationName = DewPointEquationName.VAPOR_INVERSION
     calculation_method: CalculationMethod = CalculationMethod.SOLVER
-    vapor_equation: EquationName
+    vapor_equation: VaporEquationName
 
     def __init__(
-        self, surface_type: SurfaceType, vapor_equation_name: Union[EquationName, str]
+        self,
+        surface_type: SurfaceType,
+        vapor_equation_name: Union[VaporEquationName, str],
     ):
         self.surface_type = parse_enum(value=surface_type, enum_class=SurfaceType)
         self.vapor_equation = parse_enum(
-            value=vapor_equation_name, enum_class=EquationName
+            value=vapor_equation_name, enum_class=VaporEquationName
         )
         self._update_temp_bounds()
 

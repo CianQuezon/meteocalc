@@ -16,7 +16,8 @@ from typing import Callable, NamedTuple, Optional, Tuple, Union, cast
 import numpy as np
 import numpy.typing as npt
 
-from meteocalc.vapor._enums import EquationName, SurfaceType
+from meteocalc.shared._shared_enums import SurfaceType
+from meteocalc.vapor._enums import VaporEquationName
 from meteocalc.vapor._jit_equations import (
     _bolton_scalar,
     _bolton_vectorised,
@@ -66,7 +67,7 @@ class VaporEquation(ABC):
 
     surface_type: SurfaceType
     temp_bounds: Tuple[float, float]
-    name: EquationName
+    name: VaporEquationName
     jit_function: Optional[Callable[[float], float]]
 
     def __init__(self, surface_type: Union[SurfaceType, str] = SurfaceType.AUTOMATIC):
@@ -462,7 +463,7 @@ class BoltonEquation(VaporEquation):
     where T_c is temperature in Celsius and es is in hPa.
     """
 
-    name: EquationName = EquationName.BOLTON
+    name: VaporEquationName = VaporEquationName.BOLTON
     jit_function: Callable[[float], float] = _bolton_scalar
 
     def __init__(self, surface_type: SurfaceType = SurfaceType.WATER):
@@ -549,7 +550,7 @@ class GoffGratchEquation(VaporEquation):
     >>> vapor_pressure = goff_water.calculate(293.15)
     """
 
-    name: EquationName = EquationName.GOFF_GRATCH
+    name: VaporEquationName = VaporEquationName.GOFF_GRATCH
     jit_function: Callable[[float], float] = _goff_gratch_scalar
 
     def _update_temp_bounds(self) -> None:
@@ -635,7 +636,7 @@ class HylandWexlerEquation(VaporEquation):
     >>> vapor_pressures = hyland.calculate(temps)
     """
 
-    name: EquationName = EquationName.HYLAND_WEXLER
+    name: VaporEquationName = VaporEquationName.HYLAND_WEXLER
     jit_function: Callable[[float], float] = _hyland_wexler_scalar
 
     def _update_temp_bounds(self) -> None:

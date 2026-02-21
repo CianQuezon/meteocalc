@@ -11,7 +11,8 @@ import numpy.typing as npt
 from numba import njit
 from rapid_roots.solvers import RootSolvers
 
-from meteocalc.vapor._enums import EquationName, SurfaceType
+from meteocalc.shared._shared_enums import SurfaceType
+from meteocalc.vapor._enums import VaporEquationName
 from meteocalc.vapor._vapor_equations import VaporEquation
 from meteocalc.vapor.core import Vapor
 
@@ -20,7 +21,7 @@ def get_dewpoint_using_solver(
     temp_k: Union[float, npt.ArrayLike],
     rh: Union[float, npt.ArrayLike],
     surface_type: Union[str, SurfaceType],
-    vapor_equation: Union[str, EquationName] = "goff_gratch",
+    vapor_equation: Union[str, VaporEquationName] = "goff_gratch",
 ) -> Union[tuple[float, int, bool], tuple[npt.NDArray, npt.NDArray, npt.NDArray]]:
     """
     Calculate exact dew/frost point using numerical root finding.

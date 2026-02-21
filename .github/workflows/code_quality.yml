@@ -3,7 +3,7 @@ name: Code Quality
 on:
   pull_request:
   push:
-        branches: [main, 'features/**', 'WIP/**' ]
+        branches: [main, 'features/**', 'WIP/**', 'updates/**' ]
 
 jobs:
   lint:

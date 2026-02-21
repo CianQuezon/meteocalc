@@ -1,4 +1,6 @@
-from ._enums import EquationName, SurfaceType
+from meteocalc.shared._shared_enums import SurfaceType
+
+from ._enums import VaporEquationName
 from ._vapor_equations import (
     BoltonEquation,
     GoffGratchEquation,
@@ -9,7 +11,7 @@ from .core import Vapor
 
 __all__ = [
     "Vapor",
-    "EquationName",
+    "VaporEquationName",
     "SurfaceType",
     "VaporEquation",
     "BoltonEquation",
