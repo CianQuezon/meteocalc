@@ -14,7 +14,7 @@ from meteocalc.dewpoint._dewpoint_equations import (
 from meteocalc.dewpoint._enums import CalculationMethod, DewPointEquationName
 from meteocalc.dewpoint._types import APPROXIMATION_DEWPOINT_REGISTRY
 from meteocalc.shared._enum_tools import parse_enum
-from meteocalc.vapor._enums import EquationName
+from meteocalc.vapor._enums import VaporEquationName
 
 
 class Dewpoint:
@@ -139,7 +139,7 @@ class Dewpoint:
         rh: Union[float, npt.ArrayLike],
         calculation_method: Union[str, CalculationMethod] = "approximation",
         approximation_equation: Union[str, DewPointEquationName] = "magnus",
-        solver_vapor_equation: Union[str, EquationName] = "goff_gratch",
+        solver_vapor_equation: Union[str, VaporEquationName] = "goff_gratch",
     ) -> Union[float, npt.NDArray]:
         """
         Calculate dew point (convenience wrapper).
@@ -238,7 +238,7 @@ class Dewpoint:
         rh: Union[float, npt.ArrayLike],
         calculation_method: Union[str, CalculationMethod] = "approximation",
         approximation_equation: Union[str, DewPointEquationName] = "magnus",
-        solver_vapor_equation: Union[str, EquationName] = "goff_gratch",
+        solver_vapor_equation: Union[str, VaporEquationName] = "goff_gratch",
     ) -> Union[float, npt.NDArray]:
         """
         Calculate frost point (convenience wrapper).
@@ -335,7 +335,7 @@ class Dewpoint:
     def get_dewpoint_solver(
         temp_k: Union[float, npt.ArrayLike],
         rh: Union[float, npt.ArrayLike],
-        vapor_equation_name: Union[str, EquationName] = "goff_gratch",
+        vapor_equation_name: Union[str, VaporEquationName] = "goff_gratch",
     ) -> Union[float, npt.NDArray]:
         """
         Calculate exact dew point using numerical inversion.
@@ -396,7 +396,7 @@ class Dewpoint:
         get_frostpoint_solver : Frost point (ice surface)
         """
         vapor_equation_name = parse_enum(
-            value=vapor_equation_name, enum_class=EquationName
+            value=vapor_equation_name, enum_class=VaporEquationName
         )
 
         dewpoint_solver = VaporInversionDewpoint(
@@ -408,7 +408,7 @@ class Dewpoint:
     def get_frostpoint_solver(
         temp_k: Union[float, npt.ArrayLike],
         rh: Union[float, npt.ArrayLike],
-        vapor_equation_name: Union[str, EquationName] = "goff_gratch",
+        vapor_equation_name: Union[str, VaporEquationName] = "goff_gratch",
     ) -> Union[float, npt.NDArray]:
         """
         Calculate exact frost point using numerical inversion.
@@ -475,7 +475,7 @@ class Dewpoint:
         get_frostpoint : Convenience wrapper for frost point
         """
         vapor_equation_name = parse_enum(
-            value=vapor_equation_name, enum_class=EquationName
+            value=vapor_equation_name, enum_class=VaporEquationName
         )
 
         frostpoint_solver = VaporInversionDewpoint(
