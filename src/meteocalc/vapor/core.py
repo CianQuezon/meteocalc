@@ -10,19 +10,10 @@ from typing import List, Union
 import numpy as np
 
 from meteocalc.shared._enum_tools import parse_enum
-from meteocalc.vapor._enums import EquationName, SurfaceType
-from meteocalc.vapor._vapor_equations import (
-    BoltonEquation,
-    GoffGratchEquation,
-    HylandWexlerEquation,
-    VaporEquation,
-)
-
-EQUATION_REGISTRY = {
-    EquationName.BOLTON: BoltonEquation,
-    EquationName.GOFF_GRATCH: GoffGratchEquation,
-    EquationName.HYLAND_WEXLER: HylandWexlerEquation,
-}
+from meteocalc.shared._shared_enums import SurfaceType
+from meteocalc.vapor._enums import VaporEquationName
+from meteocalc.vapor._vapor_equations import VaporEquation
+from meteocalc.vapor._types import EQUATION_REGISTRY
 
 
 class Vapor:
@@ -71,11 +62,11 @@ class Vapor:
         >>> print(equations)
         ['bolton', 'goff_gratch', 'hyland_wexler']
         """
-        return [equation.value for equation in EquationName]
+        return [equation.value for equation in VaporEquationName]
 
     @staticmethod
     def get_equation(
-        equation: Union[str, EquationName],
+        equation: Union[str, VaporEquationName],
         phase: Union[SurfaceType, str] = SurfaceType.AUTOMATIC,
     ) -> VaporEquation:
         """Get a specific saturation vapor pressure equation instance.
@@ -118,7 +109,7 @@ class Vapor:
         >>> result = bolton.calculate(293.15)
         """
 
-        equation_enum = parse_enum(equation, EquationName)
+        equation_enum = parse_enum(equation, VaporEquationName)
         phase_enum = parse_enum(phase, SurfaceType)
         equation_selected = EQUATION_REGISTRY[equation_enum](surface_type=phase_enum)
 
@@ -128,7 +119,7 @@ class Vapor:
     def get_vapor_saturation(
         temp_k: Union[np.ndarray, float],
         phase: SurfaceType = SurfaceType.AUTOMATIC,
-        equation: Union[EquationName, str] = EquationName.GOFF_GRATCH,
+        equation: Union[VaporEquationName, str] = VaporEquationName.GOFF_GRATCH,
     ) -> Union[np.ndarray, float]:
         """Calculate saturation vapor pressure at given temperature(s).
 
