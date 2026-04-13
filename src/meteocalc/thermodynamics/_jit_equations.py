@@ -49,6 +49,6 @@ def _poisson_vectorised(temp_k: npt.ArrayLike, p: npt.ArrayLike, p0: npt.ArrayLi
     results = np.empty(n, dtype=np.float64)
 
     for i in prange(n):
-        results[i] = _poisson_scalar(temp_k=temp_k, p=p, p0=p0)
+        results[i] = _poisson_scalar(temp_k=temp_k[i], p=p[i], p0=p0)
     
     return results
