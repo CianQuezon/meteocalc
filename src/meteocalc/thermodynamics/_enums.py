@@ -8,6 +8,6 @@ class ThermodynamicEquationName(Enum):
     POTENTIAL_TEMP = "potential_temp"
 
 class PotentialTemperatureMode(Enum):
-    STANDARD = "dry"
+    DRY = "dry"
     EQUIVALENT = "equivalent"
-    MOISTURE = "moisture"
+    LCL = "lcl"
