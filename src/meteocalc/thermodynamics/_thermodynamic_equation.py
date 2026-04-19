@@ -96,7 +96,17 @@ class PotentialTempEquation(ThermodynamicEquation):
     """
     Docstring for PotentialTempEquation
     """
-    name: ThermodynamicEquationName.POTENTIAL_TEMP
+    name: ThermodynamicEquationName
+    temp_bounds: tuple[float, float]
+    pres_bounds: tuple[float, float]
+
+    def __init__(self):
+        self.name = ThermodynamicEquationName.POTENTIAL_TEMP
+        self._update_input_bounds()
+
+    def _update_input_bounds(self):
+        self.temp_bounds = (150.0, 400.0) 
+        self.pres_bounds = (0.01, 1200.0)
 
 
 
