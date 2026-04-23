@@ -3,11 +3,12 @@ Jit equation for bolton lcl approximation equations.
 
 Author: Cian Quezon
 """
+
 import numpy as np
 import numpy.typing as npt
-
 from numba import njit, prange
-from meteocalc.shared.constants import cpd, Rd
+
+from meteocalc.shared.constants import Rd, cpd
 
 
 @njit
@@ -31,7 +32,10 @@ def _bolton_lcl_temp_scalar(temp_k: float, dewpoint_temp_k: float):
     float
         Temperature at the LCL in Kelvin.
     """
-    return 56.0 + 1.0 / (1.0 / (dewpoint_temp_k - 56.0) + np.log(temp_k / dewpoint_temp_k) / 800.0)
+    return 56.0 + 1.0 / (
+        1.0 / (dewpoint_temp_k - 56.0) + np.log(temp_k / dewpoint_temp_k) / 800.0
+    )
+
 
 @njit
 def _bolton_lcl_pressure_scalar(temp_k: float, lcl_temp_k: float, pressure_hpa: float):
@@ -39,7 +43,7 @@ def _bolton_lcl_pressure_scalar(temp_k: float, lcl_temp_k: float, pressure_hpa: 
     Compute the LCL pressure for a single parcel via Poisson's relation.
 
     Given the LCL temperature, derives the corresponding pressure level
-    using the dry adiabatic Poisson relation. 
+    using the dry adiabatic Poisson relation.
 
     Parameters
     ----------
@@ -56,7 +60,7 @@ def _bolton_lcl_pressure_scalar(temp_k: float, lcl_temp_k: float, pressure_hpa: 
     float
         Pressure at the LCL in hectopascals (hPa).
     """
-    return pressure_hpa * (lcl_temp_k / temp_k) ** (cpd/Rd)
+    return pressure_hpa * (lcl_temp_k / temp_k) ** (cpd / Rd)
 
 
 @njit
@@ -86,12 +90,17 @@ def _bolton_lcl_scalar(temp_k: float, dewpoint_temp_k: float, pressure_hpa: floa
         Pressure at the LCL in hectopascals (hPa).
     """
     lcl_temp_k = _bolton_lcl_temp_scalar(temp_k=temp_k, dewpoint_temp_k=dewpoint_temp_k)
-    lcl_pressure_hpa = _bolton_lcl_pressure_scalar(temp_k=temp_k, lcl_temp_k=lcl_temp_k, pressure_hpa=pressure_hpa)
+    lcl_pressure_hpa = _bolton_lcl_pressure_scalar(
+        temp_k=temp_k, lcl_temp_k=lcl_temp_k, pressure_hpa=pressure_hpa
+    )
 
     return lcl_temp_k, lcl_pressure_hpa
 
+
 @njit(parallel=True)
-def _bolton_lcl_vectorised(temp_k: npt.ArrayLike, dewpoint_temp_k: npt.ArrayLike, pressure_hpa: npt.ArrayLike):
+def _bolton_lcl_vectorised(
+    temp_k: npt.ArrayLike, dewpoint_temp_k: npt.ArrayLike, pressure_hpa: npt.ArrayLike
+):
     """
     Compute LCL temperature and pressure for an array of parcels.
 
@@ -122,6 +131,10 @@ def _bolton_lcl_vectorised(temp_k: npt.ArrayLike, dewpoint_temp_k: npt.ArrayLike
     results_lcl_press = np.empty(n, dtype=np.float64)
 
     for i in prange(n):
-        results_lcl_temp[i], results_lcl_press[i] = _bolton_lcl_scalar(temp_k=temp_k[i], dewpoint_temp_k=dewpoint_temp_k[i], pressure_hpa=pressure_hpa[i])
-    
+        results_lcl_temp[i], results_lcl_press[i] = _bolton_lcl_scalar(
+            temp_k=temp_k[i],
+            dewpoint_temp_k=dewpoint_temp_k[i],
+            pressure_hpa=pressure_hpa[i],
+        )
+
     return results_lcl_temp, results_lcl_press
