@@ -4,9 +4,9 @@ Jit equation for bolton lcl approximation equations.
 Author: Cian Quezon
 """
 
-from numba import njit, prange
 import numpy as np
 import numpy.typing as npt
+from numba import njit, prange
 
 from meteocalc.shared.constants import Rd, cpd
 
@@ -93,13 +93,14 @@ def _bolton_lcl_scalar(temp_k: float, dewpoint_temp_k: float, pressure_hpa: floa
     lcl_pressure_hpa = _bolton_lcl_pressure_scalar(
         temp_k=temp_k, lcl_temp_k=lcl_temp_k, pressure_hpa=pressure_hpa
     )
-
     return lcl_temp_k, lcl_pressure_hpa
 
 
 @njit(parallel=True)
 def _bolton_lcl_vectorised(
-    temp_k: npt.ArrayLike, dewpoint_temp_k: npt.ArrayLike, pressure_hpa: npt.ArrayLike
+    temp_k: npt.ArrayLike,
+    dewpoint_temp_k: npt.ArrayLike,
+    pressure_hpa: npt.ArrayLike,
 ):
     """
     Compute LCL temperature and pressure for an array of parcels.
@@ -125,7 +126,6 @@ def _bolton_lcl_vectorised(
     lcl_pressure_hpa : np.ndarray of float64
         LCL pressures in hectopascals (hPa), shape ``(n,)``.
     """
-
     n = len(temp_k)
     results_lcl_temp = np.empty(n, dtype=np.float64)
     results_lcl_press = np.empty(n, dtype=np.float64)
