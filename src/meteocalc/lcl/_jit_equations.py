@@ -4,9 +4,9 @@ Jit equation for bolton lcl approximation equations.
 Author: Cian Quezon
 """
 
-from numba import njit, prange
 import numpy as np
 import numpy.typing as npt
+from numba import njit, prange
 
 from meteocalc.shared.constants import Rd, cpd
 
