@@ -12,6 +12,7 @@ from numba import njit
 from rapid_roots.solvers import RootSolvers
 
 from meteocalc.shared.constants import Rd, cpd, eps
+from meteocalc.vapor._enums import SurfaceType
 from meteocalc.vapor._vapor_equations import (
     VaporEquation,
 )
@@ -142,17 +143,20 @@ def get_lcl_using_solver(
 
     was_scalar = np.ndim(temp_k) == 0 and np.ndim(dewpoint_k) == 0
 
+    _, _, below_freezing = vapor_equation._detect_surface_type(temp_k=temp_k)
+
     temp_k = np.atleast_1d(np.asarray(temp_k, dtype=np.float64))
     dewpoint_k = np.atleast_1d(np.asarray(dewpoint_k, dtype=np.float64))
     pressure_hpa = np.atleast_1d(np.asarray(pressure_hpa, dtype=np.float64))
     mixing_ratio = np.atleast_1d(np.asarray(mixing_ratio, dtype=np.float64))
+    below_freezing = np.atleast_1d(np.asarray(below_freezing, dtype=np.bool))
 
     a = dewpoint_k - (temp_k - dewpoint_k)
     b = temp_k
 
     lcl_objective_func = _get_lcl_objective_function(vapor_equation=vapor_equation)
 
-    func_params = np.column_stack([mixing_ratio, pressure_hpa, temp_k])
+    func_params = np.column_stack([mixing_ratio, pressure_hpa, temp_k, below_freezing])
 
     roots, iters, converged = RootSolvers.get_root(
         func=lcl_objective_func,
@@ -194,14 +198,31 @@ def _get_lcl_objective_function(vapor_equation: VaporEquation):
         Numba ``@njit`` scalar function with signature:
         ``(x, mixing_ratio, surface_pressure, surface_temp) -> float``
     """
+    no_constants = False
 
     vapor_scalar_func = vapor_equation.get_jit_scalar_func()
-    surface_constants = vapor_equation.get_constants()
-    tuple_surface_constants = tuple(surface_constants)
+
+    surface_ice_constants = vapor_equation.get_constants(SurfaceType.ICE)
+    surface_water_constants = vapor_equation.get_constants(SurfaceType.WATER)
+
+    if surface_ice_constants is None and surface_water_constants is None:
+        no_constants = True
+
+    if not no_constants:
+        tuple_surface_ice_constants = tuple(surface_ice_constants)
+        tuple_surface_water_constants = tuple(surface_water_constants)
+
+    else:
+        tuple_surface_ice_constants = ()
+        tuple_surface_water_constants = ()
 
     @njit
     def lcl_objective(
-        x: float, mixing_ratio: float, surface_pressure: float, surface_temp: float
+        x: float,
+        mixing_ratio: float,
+        surface_pressure: float,
+        surface_temp: float,
+        below_freezing: bool,
     ):
         """
         Scalar LCL objective function for root-finding.
@@ -226,7 +247,16 @@ def _get_lcl_objective_function(vapor_equation: VaporEquation):
         """
 
         p_lcl = surface_pressure * (x / surface_temp) ** (cpd / Rd)
-        es = vapor_scalar_func(x, *tuple_surface_constants)
+
+        if no_constants:
+            es = vapor_scalar_func(x)
+
+        else:
+            if below_freezing:
+                es = vapor_scalar_func(x, *tuple_surface_ice_constants)
+            else:
+                es = vapor_scalar_func(x, *tuple_surface_water_constants)
+
         rs = eps * es / (p_lcl - es)
 
         return rs - mixing_ratio
