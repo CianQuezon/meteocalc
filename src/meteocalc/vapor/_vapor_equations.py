@@ -355,13 +355,18 @@ class VaporEquation(ABC):
         return self.temp_bounds
 
     @abstractmethod
-    def get_constants(self):
+    def get_constants(self, surface_type: Optional[SurfaceType] = None):
         """
         Get equation-specific constants for the current surface type.
 
         Returns the named tuple containing equation-specific constants
         (coefficients) used in vapor pressure calculations. The constants
         differ depending on whether calculations are for water or ice surfaces.
+
+        Parameters
+        ----------
+        surface_type : SurfaceType or None
+            Surface type for the constants required to return
 
         Returns
         -------
@@ -479,8 +484,35 @@ class BoltonEquation(VaporEquation):
         """Set Bolton equation temperature bounds (243.15 K to 313.15 K)."""
         self.temp_bounds = (243.15, 313.15)
 
-    def get_constants(self):
-        warnings.warn("Bolton only has water constants.", stacklevel=2)
+    def get_constants(self, surface_type: Optional[SurfaceType] = None):
+        """
+        Get equation-specific constants for Bolton's equation.
+
+        Bolton is a self-contained empirical formula that requires
+        no external constants — the coefficients are embedded in the
+        ``_bolton_scalar`` JIT function directly. This method always
+        returns ``None``.
+
+        Parameters
+        ----------
+        surface_type : SurfaceType, optional
+            Surface type. Bolton only supports water — passing
+            ``SurfaceType.ICE`` raises a warning.
+
+        Returns
+        -------
+        None
+            Bolton requires no external constants. The JIT scalar
+            function returned by ``get_jit_scalar_func()`` is
+            self-contained and accepts no constant arguments.
+
+        """
+        if surface_type == SurfaceType.ICE:
+            warnings.warn(
+                "Bolton does not support ice surface constants."
+                "Use GoffGratchEquation or HylandWexlerEquation for ice surfaces.",
+                stacklevel=2,
+            )
         return None
 
     def calculate(
@@ -561,10 +593,15 @@ class GoffGratchEquation(VaporEquation):
         elif self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (173.15, 273.16)
 
-    def get_constants(self):
-        if self.surface_type == SurfaceType.WATER:
+    def get_constants(self, surface_type: Optional[SurfaceType] = None):
+        if surface_type is None:
+            if self.surface_type == SurfaceType.WATER:
+                return GOFF_GRATCH_WATER
+            elif self.surface_type == SurfaceType.ICE:
+                return GOFF_GRATCH_ICE
+        elif surface_type == SurfaceType.WATER:
             return GOFF_GRATCH_WATER
-        elif self.surface_type == SurfaceType.ICE:
+        elif surface_type == SurfaceType.ICE:
             return GOFF_GRATCH_ICE
 
     def calculate(
@@ -647,10 +684,15 @@ class HylandWexlerEquation(VaporEquation):
         elif self.surface_type == SurfaceType.ICE:
             self.temp_bounds = (173.15, 273.16)
 
-    def get_constants(self):
-        if self.surface_type == SurfaceType.WATER:
+    def get_constants(self, surface_type: Optional[SurfaceType] = None):
+        if surface_type is None:
+            if self.surface_type == SurfaceType.WATER:
+                return HYLAND_WEXLER_WATER
+            elif self.surface_type == SurfaceType.ICE:
+                return HYLAND_WEXLER_ICE
+        elif surface_type == SurfaceType.WATER:
             return HYLAND_WEXLER_WATER
-        elif self.surface_type == SurfaceType.ICE:
+        elif surface_type == SurfaceType.ICE:
             return HYLAND_WEXLER_ICE
 
     def calculate(
