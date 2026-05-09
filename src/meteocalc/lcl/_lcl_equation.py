@@ -253,7 +253,54 @@ class LiftingCondensationLevelEquation(ABC):
 
 class BoltonLclEquation(LiftingCondensationLevelEquation):
     """
-    Docstring for BoltonLclEquation
+    LCL temperature and pressure using Bolton (1980) closed-form approximation.
+
+    Implements Bolton (1980) eq. 15 for LCL temperature and the dry
+    adiabatic Poisson relation for LCL pressure. This is the fastest
+    LCL method in meteocalc — a single formula evaluation with no
+    iteration — at the cost of an approximation error of ~0.1–2 K
+    depending on dewpoint depression.
+
+    Valid for surface temperatures in [233.15, 323.15] K (-40°C to 50°C)
+    and dewpoint depressions up to ~30 K, as stated in Bolton (1980).
+    Results outside this range are extrapolations and may be inaccurate.
+
+    Attributes
+    ----------
+    name : LclEquationName
+        ``LclEquationName.BOLTON``
+    calculation_method : CalculationMethod
+        ``CalculationMethod.APPROXIMATION``
+
+    Examples
+    --------
+    Scalar input:
+
+    >>> from meteocalc.lcl._lcl_equation import BoltonLclEquation
+    >>> eq = BoltonLclEquation()
+    >>> lcl_temp, lcl_pressure = eq.calculate(
+    ...     temp_k=293.15,
+    ...     dewpoint_temp_k=285.15,
+    ...     pressure_hpa=1013.25,
+    ... )
+    >>> print(f"T_LCL = {lcl_temp:.2f} K  ({lcl_temp - 273.15:.2f} °C)")
+    T_LCL = 283.35 K  (10.20 °C)
+    >>> print(f"P_LCL = {lcl_pressure:.2f} hPa")
+    P_LCL = 917.23 hPa
+
+    Array input:
+
+    >>> import numpy as np
+    >>> temp_arr     = np.array([293.15, 303.15, 283.15])
+    >>> dewpoint_arr = np.array([285.15, 298.15, 278.15])
+    >>> pressure_arr = np.full(3, 1013.25)
+    >>> lcl_temps, lcl_pressures = eq.calculate(
+    ...     temp_k=temp_arr,
+    ...     dewpoint_temp_k=dewpoint_arr,
+    ...     pressure_hpa=pressure_arr,
+    ... )
+    >>> print(lcl_temps)
+    [283.35 296.94 277.06]
     """
 
     name: LclEquationName = LclEquationName.BOLTON
