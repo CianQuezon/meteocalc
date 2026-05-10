@@ -132,7 +132,7 @@ STANDARD_CASES = [
 ]
 
 # Flat tolerance — solver error is constant, not depression-dependent
-METPY_TOL_K   = 0.1    # K
+METPY_TOL_K   = 0.02    # K
 METPY_TOL_HPA = 0.6    # hPa
 
 DEPRESSION_SWEEP = [
