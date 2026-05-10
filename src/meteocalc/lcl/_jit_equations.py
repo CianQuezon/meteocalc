@@ -4,8 +4,6 @@ Jit equation for bolton lcl approximation equations.
 Author: Cian Quezon
 """
 
-from typing import Union
-
 import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
@@ -40,7 +38,7 @@ def _bolton_lcl_temp_scalar(temp_k: float, dewpoint_temp_k: float) -> float:
 
 
 @njit
-def _bolton_lcl_pressure_scalar(
+def _lcl_pressure_scalar(
     temp_k: float, lcl_temp_k: float, pressure_hpa: float
 ) -> float:
     """
@@ -65,6 +63,47 @@ def _bolton_lcl_pressure_scalar(
         Pressure at the LCL in hectopascals (hPa).
     """
     return pressure_hpa * (lcl_temp_k / temp_k) ** (cpd / Rd)
+
+
+@njit(parallel=True)
+def _lcl_pressure_vectorised(
+    temp_k: npt.ArrayLike, lcl_temp_k: npt.ArrayLike, pressure_hpa: npt.ArrayLike
+) -> npt.NDArray:
+    """
+    Compute LCL pressure for an array of parcels via the Poisson relation.
+
+    Vectorised equivalent of ``_lcl_pressure_scalar``, parallelised
+    across CPU cores via ``numba.prange``. Applies the dry adiabatic
+    Poisson relation element-wise:
+
+        p_LCL = p_surface * (T_LCL / T_surface) ^ (cpd / Rd)
+
+    Parameters
+    ----------
+    temp_k : array-like of float
+        1-D array of surface air temperatures in Kelvin, shape ``(n,)``.
+    lcl_temp_k : array-like of float
+        1-D array of LCL temperatures in Kelvin, shape ``(n,)``.
+        Must satisfy ``lcl_temp_k[i] <= temp_k[i]`` for all ``i``.
+    pressure_hpa : array-like of float
+        1-D array of surface pressures in hectopascals (hPa),
+        shape ``(n,)``.
+
+    Returns
+    -------
+    ndarray of float64
+        LCL pressures in hectopascals (hPa), shape ``(n,)``.
+        Satisfies ``result[i] <= pressure_hpa[i]`` for all ``i``.
+
+    """
+    n = len(temp_k)
+    result = np.empty(n, dtype=np.float64)
+
+    for i in prange(n):
+        result[i] = _lcl_pressure_scalar(
+            temp_k=temp_k[i], lcl_temp_k=lcl_temp_k[i], pressure_hpa=pressure_hpa[i]
+        )
+    return result
 
 
 @njit
@@ -96,7 +135,7 @@ def _bolton_lcl_scalar(
         Pressure at the LCL in hectopascals (hPa).
     """
     lcl_temp_k = _bolton_lcl_temp_scalar(temp_k=temp_k, dewpoint_temp_k=dewpoint_temp_k)
-    lcl_pressure_hpa = _bolton_lcl_pressure_scalar(
+    lcl_pressure_hpa = _lcl_pressure_scalar(
         temp_k=temp_k, lcl_temp_k=lcl_temp_k, pressure_hpa=pressure_hpa
     )
 
@@ -106,7 +145,7 @@ def _bolton_lcl_scalar(
 @njit(parallel=True)
 def _bolton_lcl_vectorised(
     temp_k: npt.ArrayLike, dewpoint_temp_k: npt.ArrayLike, pressure_hpa: npt.ArrayLike
-) -> tuple[Union[float, npt.NDArray], Union[float, npt.NDArray]]:
+) -> tuple[npt.NDArray, npt.NDArray]:
     """
     Compute LCL temperature and pressure for an array of parcels.
 
