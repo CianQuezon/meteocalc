@@ -11,8 +11,8 @@ import numpy.typing as npt
 from numba import njit
 from rapid_roots.solvers import RootSolvers
 
+from meteocalc.shared._shared_enums import SurfaceType
 from meteocalc.shared.constants import Rd, cpd, eps
-from meteocalc.vapor._enums import SurfaceType
 from meteocalc.vapor._vapor_equations import (
     VaporEquation,
 )
