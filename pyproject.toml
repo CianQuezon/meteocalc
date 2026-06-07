@@ -34,7 +34,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13", 
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -82,7 +82,7 @@ Issues = "https://github.com/CianQuezon/meteocalc/issues"
 Changelog = "https://github.com/CianQuezon/meteocalc/releases"
 
 [tool.setuptools]
-packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor", "meteocalc.dewpoint"]
+packages = ["meteocalc", "meteocalc.shared", "meteocalc.vapor", "meteocalc.dewpoint", "meteocalc.thermodynamics"]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
@@ -96,13 +96,13 @@ addopts = [
     "-v",
     "--strict-markers",
     "--strict-config",
-    "--tb=short" 
+    "--tb=short"
 ]
 
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "unit: marks tests as unit tests",
-    "integration: marks tests as integration tests" 
+    "integration: marks tests as integration tests"
 ]
 
 [tool.coverage.report]
@@ -116,7 +116,7 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
     "@abstractmethod",
-    "@abc.abstractmethod",  
+    "@abc.abstractmethod",
 ]
 
 precision = 2
