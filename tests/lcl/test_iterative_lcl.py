@@ -193,9 +193,9 @@ class TestVaporModuleIntegration:
 
     def test_string_and_enum_inputs_give_identical_results(self, eq):
         """Vapor.get_equation() with string vs enum must give identical results."""
-        from meteocalc.vapor._enums import EquationName
-        vapor_str  = Vapor.get_equation("goff_gratch",           phase="water")
-        vapor_enum = Vapor.get_equation(EquationName.GOFF_GRATCH, phase="water")
+        from meteocalc.vapor._enums import VaporEquationName
+        vapor_str  = Vapor.get_equation("goff_gratch",                phase="water")
+        vapor_enum = Vapor.get_equation(VaporEquationName.GOFF_GRATCH, phase="water")
 
         w_str  = _mixing_ratio(vapor_str,  285.15, 1013.25)
         w_enum = _mixing_ratio(vapor_enum, 285.15, 1013.25)
