@@ -45,7 +45,7 @@ def _bolton_theta_e_scalar(temp_k: float, lcl_temp_k: float,
     theta_L = _bolton_theta_l_scalar(temp_k=temp_k, lcl_temp_k=lcl_temp_k, pressure_hpa=pressure_hpa,
                                          vapor_pressure_hpa=vapor_pressure_hpa, mixing_ratio=mixing_ratio, p0=p0)
     
-    exponential_term = ((3376.0/lcl_temp_k) - 0.00254) * mixing_ratio * (1.0 + 0.81 * mixing_ratio)
+    exponential_term = ((3036/lcl_temp_k) - 1.78) * mixing_ratio * (1.0 + 0.448 * mixing_ratio)
 
     if exponential_term > 50.0:
         return math.nan
@@ -57,7 +57,7 @@ def _bolton_theta_e_scalar(temp_k: float, lcl_temp_k: float,
 @njit
 def _bolton_theta_e_vectorised(temp_k: npt.ArrayLike, lcl_temp_k: npt.ArrayLike,
                                       pressure_hpa: npt.ArrayLike, vapor_pressure_hpa: npt.ArrayLike,
-                                      mixing_ratio: npt.ArrayLike, p0: npt.ArrayLike):
+                                      mixing_ratio: npt.ArrayLike, p0: float = 1000.0):
     """
     Vectorized calculation of equivalent potential temperature (θE).
     
@@ -90,7 +90,7 @@ def _bolton_theta_e_vectorised(temp_k: npt.ArrayLike, lcl_temp_k: npt.ArrayLike,
     for i in prange(n):
         results[i] = _bolton_theta_e_scalar(temp_k=temp_k[i], lcl_temp_k=lcl_temp_k[i],
                                       pressure_hpa=pressure_hpa[i], vapor_pressure_hpa=vapor_pressure_hpa[i],
-                                      mixing_ratio=mixing_ratio[i], p0=p0[i])
+                                      mixing_ratio=mixing_ratio[i], p0=p0)
     
     return results
 
@@ -137,7 +137,7 @@ def _bolton_theta_l_scalar(temp_k: float, lcl_temp_k: float,
 @njit
 def _bolton_theta_l_vectorised(temp_k: npt.ArrayLike, lcl_temp_k: npt.ArrayLike,
                                pressure_hpa: npt.ArrayLike, vapor_pressure_hpa: npt.ArrayLike,
-                               mixing_ratio: npt.ArrayLike, p0: npt.ArrayLike):
+                               mixing_ratio: npt.ArrayLike, p0: float = 1000.0):
     """
     Vectorized calculation of potential temperature at LCL (θL).
     
@@ -171,7 +171,7 @@ def _bolton_theta_l_vectorised(temp_k: npt.ArrayLike, lcl_temp_k: npt.ArrayLike,
     for i in prange(n):
         results[i] = _bolton_theta_l_scalar(temp_k=temp_k[i], lcl_temp_k=lcl_temp_k[i],
                                                 pressure_hpa=pressure_hpa[i], vapor_pressure_hpa=vapor_pressure_hpa[i],
-                                                 mixing_ratio=mixing_ratio[i], p0=p0[i])
+                                                 mixing_ratio=mixing_ratio[i], p0=p0)
     
     return results
 
