@@ -70,7 +70,7 @@ def _bolton_theta_e_scalar(
     return theta_E
 
 
-@njit
+@njit(parallel=True)
 def _bolton_theta_e_vectorised(
     temp_k: npt.ArrayLike,
     lcl_temp_k: npt.ArrayLike,
@@ -167,7 +167,7 @@ def _bolton_theta_l_scalar(
     return temp_k * pressure_term * moisture_term
 
 
-@njit
+@njit(parallel=True)
 def _bolton_theta_l_vectorised(
     temp_k: npt.ArrayLike,
     lcl_temp_k: npt.ArrayLike,
@@ -241,7 +241,7 @@ def _poisson_scalar(temp_k: float, p: float, p0: float = 1000.0):
     return temp_k * (p0 / p) ** kappa
 
 
-@njit
+@njit(parallel=True)
 def _poisson_vectorised(temp_k: npt.ArrayLike, p: npt.ArrayLike, p0: npt.ArrayLike):
     """
     Compute potential temperature using Poisson's equation.
