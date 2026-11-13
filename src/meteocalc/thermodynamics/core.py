@@ -5,12 +5,14 @@ Public interface for thermodynamic potential temperature calculations.
 from typing import Optional, Union
 
 import numpy.typing as npt
-from pyparsing import results
 
-from meteocalc.thermodynamics._enums import PotentialTemperatureMode
-from meteocalc.thermodynamics._thermodynamic_equation import BoltonPotentialTempEquation, PoissonEquation
-from meteocalc.thermodynamics._types import POTENTIAL_TEMP_REGISTRY
 from meteocalc.shared._enum_tools import parse_enum
+from meteocalc.thermodynamics._enums import PotentialTemperatureMode
+from meteocalc.thermodynamics._thermodynamic_equation import (
+    BoltonPotentialTempEquation,
+    PoissonEquation,
+)
+from meteocalc.thermodynamics._types import POTENTIAL_TEMP_REGISTRY
 
 
 class Thermodynamics:
@@ -167,9 +169,7 @@ class Thermodynamics:
             if val is None
         ]
         if missing:
-            raise ValueError(
-                f"mode='{mode_enum.value}' requires: {', '.join(missing)}"
-            )
+            raise ValueError(f"mode='{mode_enum.value}' requires: {', '.join(missing)}")
 
         if mode_enum == PotentialTemperatureMode.LCL:
             return Thermodynamics.get_lcl_potential_temperature(
