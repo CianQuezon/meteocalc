@@ -725,8 +725,3 @@ class HylandWexlerEquation(VaporEquation):
                 vector_func=_hyland_wexler_vectorised,
                 equation_constant=HYLAND_WEXLER_ICE,
             )
-
-
-if __name__ == "__main__":
-    hyland = HylandWexlerEquation(surface_type="water")
-    print(hyland.get_constants())
