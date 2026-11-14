@@ -725,5 +725,3 @@ class HylandWexlerEquation(VaporEquation):
                 vector_func=_hyland_wexler_vectorised,
                 equation_constant=HYLAND_WEXLER_ICE,
             )
-
-

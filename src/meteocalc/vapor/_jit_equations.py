@@ -284,4 +284,3 @@ def _mixing_ratio_vectorised(
     for i in prange(n):
         result[i] = _mixing_ratio_scalar(vapor_pressure_hpa[i], pressure_hpa[i])
     return result
-

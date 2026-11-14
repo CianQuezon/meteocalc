@@ -13,12 +13,6 @@ from meteocalc.vapor._jit_equations import (
     _mixing_ratio_scalar,
     _mixing_ratio_vectorised,
 )
-from meteocalc.vapor._vapor_constants import (
-    GOFF_GRATCH_ICE,
-    GOFF_GRATCH_WATER,
-    HYLAND_WEXLER_ICE,
-    HYLAND_WEXLER_WATER,
-)
 
 
 class MixingRatioEquation:
@@ -65,9 +59,9 @@ class MixingRatioEquation:
     """
 
     def _broadcast_inputs(
-            self,
-            vapor_pressure_hpa: Union[npt.ArrayLike, float],
-            pressure_hpa: Union[npt.ArrayLike, float],
+        self,
+        vapor_pressure_hpa: Union[npt.ArrayLike, float],
+        pressure_hpa: Union[npt.ArrayLike, float],
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], bool]:
         """Broadcast vapor pressure and total pressure to compatible shapes.
 
@@ -97,7 +91,7 @@ class MixingRatioEquation:
         return (
             np.ascontiguousarray(vapor_pressure_hpa),
             np.ascontiguousarray(pressure_hpa),
-            was_scalar
+            was_scalar,
         )
 
     def _dispatch_scalar_or_vector(
@@ -105,7 +99,7 @@ class MixingRatioEquation:
         vapor_pressure_hpa: Union[npt.ArrayLike, float],
         pressure_hpa: Union[npt.ArrayLike, float],
         vector_func: Callable[[np.ndarray, np.ndarray], np.ndarray],
-        scalar_func: Callable[[float, float], float]
+        scalar_func: Callable[[float, float], float],
     ) -> Union[npt.NDArray[np.float64], float]:
         """Dispatch to scalar or vectorized mixing ratio calculation.
 
@@ -126,8 +120,7 @@ class MixingRatioEquation:
         pressure_hpa = np.asarray(pressure_hpa)
 
         vapor_pressure_hpa, pressure_hpa, is_scalar = self._broadcast_inputs(
-            vapor_pressure_hpa=vapor_pressure_hpa,
-            pressure_hpa=pressure_hpa
+            vapor_pressure_hpa=vapor_pressure_hpa, pressure_hpa=pressure_hpa
         )
 
         if is_scalar:
@@ -136,9 +129,12 @@ class MixingRatioEquation:
             pressure_hpa_shape = pressure_hpa.shape
             vapor_pressure_hpa_flatten = vapor_pressure_hpa.flatten()
             pressure_hpa_flatten = pressure_hpa.flatten()
-            return vector_func(vapor_pressure_hpa_flatten, pressure_hpa_flatten).reshape(pressure_hpa_shape)
-    
-    def calculate(self,
+            return vector_func(
+                vapor_pressure_hpa_flatten, pressure_hpa_flatten
+            ).reshape(pressure_hpa_shape)
+
+    def calculate(
+        self,
         vapor_pressure_hpa: Union[npt.ArrayLike, float],
         pressure_hpa: Union[npt.ArrayLike, float],
     ) -> Union[npt.NDArray[np.float64], float]:
@@ -158,5 +154,9 @@ class MixingRatioEquation:
             Mixing ratio (dimensionless, kg/kg). NaN where
             ``pressure_hpa <= vapor_pressure_hpa`` (unphysical).
         """
-        return self._dispatch_scalar_or_vector(vapor_pressure_hpa=vapor_pressure_hpa, pressure_hpa=pressure_hpa, scalar_func=_mixing_ratio_scalar, vector_func=_mixing_ratio_vectorised)
-
+        return self._dispatch_scalar_or_vector(
+            vapor_pressure_hpa=vapor_pressure_hpa,
+            pressure_hpa=pressure_hpa,
+            scalar_func=_mixing_ratio_scalar,
+            vector_func=_mixing_ratio_vectorised,
+        )

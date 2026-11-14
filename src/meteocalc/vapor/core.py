@@ -12,9 +12,9 @@ import numpy as np
 from meteocalc.shared._enum_tools import parse_enum
 from meteocalc.shared._shared_enums import SurfaceType
 from meteocalc.vapor._enums import VaporEquationName
+from meteocalc.vapor._mixing_ratio_equation import MixingRatioEquation
 from meteocalc.vapor._types import EQUATION_REGISTRY
 from meteocalc.vapor._vapor_equations import VaporEquation
-from meteocalc.vapor._mixing_ratio_equation import MixingRatioEquation
 
 
 class Vapor:
@@ -231,5 +231,4 @@ class Vapor:
 
         return mixing_ratio_equation.calculate(
             vapor_pressure_hpa=vapor_pressure_hpa, pressure_hpa=pressure_hpa
-        )   
-
+        )
