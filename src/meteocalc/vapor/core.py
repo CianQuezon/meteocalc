@@ -14,6 +14,7 @@ from meteocalc.shared._shared_enums import SurfaceType
 from meteocalc.vapor._enums import VaporEquationName
 from meteocalc.vapor._types import EQUATION_REGISTRY
 from meteocalc.vapor._vapor_equations import VaporEquation
+from meteocalc.vapor._mixing_ratio_equation import MixingRatioEquation
 
 
 class Vapor:
@@ -192,3 +193,43 @@ class Vapor:
         equation_selected = Vapor.get_equation(equation, phase=phase)
         vapor_saturation = equation_selected.calculate(temp_k=temp_k)
         return vapor_saturation
+
+    @staticmethod
+    def get_mixing_ratio(
+        vapor_pressure_hpa: Union[np.ndarray, float],
+        pressure_hpa: Union[np.ndarray, float],
+    ) -> Union[np.ndarray, float]:
+        """Calculate mixing ratio from vapor pressure and total pressure.
+
+        Parameters
+        ----------
+        vapor_pressure_hpa : float or array_like
+            Vapor pressure in hPa.
+        pressure_hpa : float or array_like
+            Total atmospheric pressure in hPa.
+
+        Returns
+        -------
+        float or ndarray
+            Mixing ratio in kg/kg. Returns same shape as input arrays.
+
+        Raises
+        ------
+        ValueError
+            If input shapes cannot be broadcast together.
+
+        Notes
+        -----
+        Returns NaN where ``pressure_hpa <= vapor_pressure_hpa`` (unphysical).
+
+        Examples
+        --------
+        >>> Vapor.get_mixing_ratio(vapor_pressure_hpa=23.37, pressure_hpa=1000.0)
+        0.01488...
+        """
+        mixing_ratio_equation = MixingRatioEquation()
+
+        return mixing_ratio_equation.calculate(
+            vapor_pressure_hpa=vapor_pressure_hpa, pressure_hpa=pressure_hpa
+        )   
+
