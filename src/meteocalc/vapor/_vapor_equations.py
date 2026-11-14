@@ -25,6 +25,8 @@ from meteocalc.vapor._jit_equations import (
     _goff_gratch_vectorised,
     _hyland_wexler_scalar,
     _hyland_wexler_vectorised,
+    _mixing_ratio_scalar,
+    _mixing_ratio_vectorised,
 )
 from meteocalc.vapor._vapor_constants import (
     GOFF_GRATCH_ICE,
@@ -727,6 +729,118 @@ class HylandWexlerEquation(VaporEquation):
             )
 
 
-if __name__ == "__main__":
-    hyland = HylandWexlerEquation(surface_type="water")
-    print(hyland.get_constants())
+class MixingRatioEquation:
+    """Calculate the mixing ratio of water vapor in air.
+
+    The mixing ratio is defined as the mass of water vapor per unit mass of dry air.
+    This class provides methods to calculate the mixing ratio given vapor pressure
+    and total atmospheric pressure.
+
+    Attributes
+    ----------
+    eps : float
+        Ratio of the gas constant for dry air to that for water vapor (Rd/Rv).
+        Typically, eps = 0.622.
+
+    Methods
+    -------
+    calculate(vapor_pressure_hpa, pressure_hpa)
+        Calculate the mixing ratio given vapor pressure and total pressure.
+    """
+
+    def _broadcast_inputs(
+            self,
+            vapor_pressure_hpa: Union[npt.ArrayLike, float],
+            pressure_hpa: Union[npt.ArrayLike, float],
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], bool]:
+        """Broadcast vapor pressure and total pressure to compatible shapes.
+
+        Parameters
+        ----------
+        vapor_pressure_hpa : float or array_like
+            Vapor pressure in hPa.
+        pressure_hpa : float or array_like
+            Total atmospheric pressure in hPa.
+
+        Returns
+        -------
+        Tuple of (vapor_pressure_broadcasted, pressure_broadcasted, is_scalar)
+            - vapor_pressure_broadcasted: Broadcasted vapor pressure array.
+            - pressure_broadcasted: Broadcasted total pressure array.
+            - is_scalar: True if both inputs were scalars, False otherwise.
+        """
+        vapor_pressure_hpa = np.asarray(vapor_pressure_hpa)
+        pressure_hpa = np.asarray(pressure_hpa)
+
+        was_scalar = vapor_pressure_hpa.ndim == 0 and pressure_hpa.ndim == 0
+
+        vapor_pressure_hpa, pressure_hpa = np.broadcast_arrays(
+            vapor_pressure_hpa, pressure_hpa
+        )
+
+        return (
+            np.ascontiguousarray(vapor_pressure_hpa),
+            np.ascontiguousarray(pressure_hpa),
+            was_scalar
+        )
+
+    def _dispatch_scalar_or_vector(
+        self,
+        vapor_pressure_hpa: Union[npt.ArrayLike, float],
+        pressure_hpa: Union[npt.ArrayLike, float],
+        vector_func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        scalar_func: Callable[[float, float], float]
+    ) -> Union[npt.NDArray[np.float64], float]:
+        """Dispatch to scalar or vectorized mixing ratio calculation.
+
+        Parameters
+        ----------
+        vapor_pressure_hpa : float or array_like
+            Vapor pressure in hPa.
+        pressure_hpa : float or array_like
+            Total atmospheric pressure in hPa.
+
+        Returns
+        -------
+        float or ndarray
+            Mixing ratio (dimensionless, kg/kg). NaN where
+            ``pressure_hpa <= vapor_pressure_hpa`` (unphysical).
+        """
+        vapor_pressure_hpa = np.asarray(vapor_pressure_hpa)
+        pressure_hpa = np.asarray(pressure_hpa)
+
+        vapor_pressure_hpa, pressure_hpa, is_scalar = self._broadcast_inputs(
+            vapor_pressure_hpa=vapor_pressure_hpa,
+            pressure_hpa=pressure_hpa
+        )
+
+        if is_scalar:
+            return scalar_func(vapor_pressure_hpa.item(), pressure_hpa.item())
+        else:
+            pressure_hpa_shape = pressure_hpa.shape
+            vapor_pressure_hpa_flatten = vapor_pressure_hpa.flatten()
+            pressure_hpa_flatten = pressure_hpa.flatten()
+            return vector_func(vapor_pressure_hpa_flatten, pressure_hpa_flatten).reshape(pressure_hpa_shape)
+    
+    def calculate(self,
+        vapor_pressure_hpa: Union[npt.ArrayLike, float],
+        pressure_hpa: Union[npt.ArrayLike, float],
+    ) -> Union[npt.NDArray[np.float64], float]:
+        """
+        Calculate the mixing ratio of water vapor in air.
+
+        Parameters
+        ----------
+        vapor_pressure_hpa : float or array_like
+            Vapor pressure in hPa.
+        pressure_hpa : float or array_like
+            Total atmospheric pressure in hPa.
+
+        Returns
+        -------
+        float or ndarray
+            Mixing ratio (dimensionless, kg/kg). NaN where
+            ``pressure_hpa <= vapor_pressure_hpa`` (unphysical).
+        """
+        return self._dispatch_scalar_or_vector(vapor_pressure_hpa=vapor_pressure_hpa, pressure_hpa=pressure_hpa, scalar_func=_mixing_ratio_scalar, vector_func=_mixing_ratio_vectorised)
+
