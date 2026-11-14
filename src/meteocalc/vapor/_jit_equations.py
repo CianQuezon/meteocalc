@@ -13,6 +13,8 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
 
+from meteocalc.shared.constants import eps
+
 
 @njit
 def _bolton_scalar(temp_k: float) -> float:
@@ -233,3 +235,53 @@ def _hyland_wexler_vectorised(
     for i in prange(n):
         result[i] = _hyland_wexler_scalar(temp_k[i], A, B, C, D, E, F, G)
     return result
+
+
+@njit
+def _mixing_ratio_scalar(vapor_pressure_hpa: float, pressure_hpa: float) -> float:
+    """
+    Calculate the mixing ratio of water vapor in air.
+
+    Parameters
+    ----------
+    vapor_pressure_hpa : float
+        Vapor pressure in hPa.
+    pressure_hpa : float
+        Total atmospheric pressure in hPa.
+
+    Returns
+    -------
+    float
+        Mixing ratio (dimensionless, kg/kg). NaN where
+        ``pressure_hpa <= vapor_pressure_hpa`` (unphysical).
+    """
+    if pressure_hpa <= vapor_pressure_hpa:
+        return np.nan
+    return eps * vapor_pressure_hpa / (pressure_hpa - vapor_pressure_hpa)
+
+
+@njit(parallel=True)
+def _mixing_ratio_vectorised(
+    vapor_pressure_hpa: npt.ArrayLike, pressure_hpa: npt.ArrayLike
+) -> npt.NDArray[np.float64]:
+    """
+    Vectorized calculation of the mixing ratio of water vapor in air.
+
+    Parameters
+    ----------
+    vapor_pressure_hpa : array_like
+        Vapor pressure array in hPa.
+    pressure_hpa : array_like
+        Total atmospheric pressure array in hPa.
+
+    Returns
+    -------
+    ndarray
+        Mixing ratio array (dimensionless, kg/kg).
+    """
+    n = len(vapor_pressure_hpa)
+    result = np.empty(n, dtype=np.float64)
+    for i in prange(n):
+        result[i] = _mixing_ratio_scalar(vapor_pressure_hpa[i], pressure_hpa[i])
+    return result
+
