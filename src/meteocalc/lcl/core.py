@@ -307,6 +307,11 @@ class Lcl:
         get_lcl : Dispatcher that routes to approximation or solver.
         meteocalc.lcl._solver_method.get_lcl_using_solver : Low-level solver.
         """
+        if mixing_ratio is None:
+            raise TypeError(
+                "Mixing ratio is required to perform solver method for LCL."
+            )
+
         lcl_solver_equation_enum = parse_enum(solver_name, LclEquationName)
         lcl_solver_equation = LCL_SOLVER_REGISTRY[lcl_solver_equation_enum]
 
