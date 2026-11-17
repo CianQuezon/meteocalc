@@ -142,6 +142,12 @@ def get_dewpoint_using_solver(
     return roots, iters, converged
 
 
+# Compiled objective functions, keyed by (vapor equation class, surface type).
+# A fresh ``@njit`` closure is a new Numba type, so building one per call forces
+# the root solver to recompile every time. Build once and reuse.
+_OBJECTIVE_CACHE: dict = {}
+
+
 def get_dewpoint_objective_function(vapor_equation: VaporEquation):
     """
     Create JIT-compiled objective function for dew point root finding.
@@ -203,6 +209,11 @@ def get_dewpoint_objective_function(vapor_equation: VaporEquation):
     meteocalc.vapor.VaporEquation : Base class for vapor equations
     """
 
+    cache_key = (type(vapor_equation), vapor_equation.surface_type)
+    cached_objective = _OBJECTIVE_CACHE.get(cache_key)
+    if cached_objective is not None:
+        return cached_objective
+
     vapor_scalar_func = vapor_equation.get_jit_scalar_func()
     surface_constants = vapor_equation.get_constants()
     tuple_surface_constants = tuple(surface_constants)
@@ -233,4 +244,5 @@ def get_dewpoint_objective_function(vapor_equation: VaporEquation):
 
         return e_sat - e_actual
 
+    _OBJECTIVE_CACHE[cache_key] = dewpoint_objective
     return dewpoint_objective
