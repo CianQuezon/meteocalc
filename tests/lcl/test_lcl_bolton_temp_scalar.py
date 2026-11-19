@@ -19,14 +19,14 @@ Dependencies
 
 import math
 
-import numpy as np
 import pytest
-from numba import njit
+
 from meteocalc.lcl._jit_equations import _bolton_lcl_temp_scalar
 
 # ---------------------------------------------------------------------------
 # ---- MetPy helper ---------------------------------------------------------
 # ---------------------------------------------------------------------------
+
 
 def _metpy_lcl_temp(pressure_hpa: float, temp_k: float, dewpoint_k: float) -> float:
     """
@@ -55,29 +55,30 @@ def _metpy_lcl_temp(pressure_hpa: float, temp_k: float, dewpoint_k: float) -> fl
 # is pressure-independent.
 STANDARD_CASES = [
     # (label,              P(hPa), T(K),   Td(K))
-    ("standard_midlat",    1013.25, 293.15, 285.15),   # 20 °C / 12 °C
-    ("warm_humid",         1000.0,  303.15, 298.15),   # 30 °C / 25 °C  – tropical
-    ("cool_dry",           1013.25, 278.15, 265.15),   # 5 °C / -8 °C
-    ("cold_arctic",        1013.25, 253.15, 248.15),   # -20 °C / -25 °C
-    ("very_warm_tropical", 1000.0,  308.15, 303.15),   # 35 °C / 30 °C
-    ("high_elevation_ish", 850.0,   285.15, 278.15),   # 12 °C / 5 °C   (850 hPa level)
-    ("near_saturated",     1013.25, 290.15, 289.15),   # 1 K depression
-    ("moderate_dry",       1013.25, 295.15, 280.15),   # 22 °C / 7 °C
-    ("summer_continental", 1000.0,  300.15, 290.15),   # 27 °C / 17 °C
-    ("autumn_uk",          1013.25, 283.15, 278.15),   # 10 °C / 5 °C
+    ("standard_midlat", 1013.25, 293.15, 285.15),  # 20 °C / 12 °C
+    ("warm_humid", 1000.0, 303.15, 298.15),  # 30 °C / 25 °C  – tropical
+    ("cool_dry", 1013.25, 278.15, 265.15),  # 5 °C / -8 °C
+    ("cold_arctic", 1013.25, 253.15, 248.15),  # -20 °C / -25 °C
+    ("very_warm_tropical", 1000.0, 308.15, 303.15),  # 35 °C / 30 °C
+    ("high_elevation_ish", 850.0, 285.15, 278.15),  # 12 °C / 5 °C   (850 hPa level)
+    ("near_saturated", 1013.25, 290.15, 289.15),  # 1 K depression
+    ("moderate_dry", 1013.25, 295.15, 280.15),  # 22 °C / 7 °C
+    ("summer_continental", 1000.0, 300.15, 290.15),  # 27 °C / 17 °C
+    ("autumn_uk", 1013.25, 283.15, 278.15),  # 10 °C / 5 °C
 ]
 
 # Dewpoint depressions (T - Td) to sweep across at a fixed base temperature
 DEPRESSION_SWEEP_TEMPS = [
-    (273.15 + 0,   [1, 2, 5, 10, 20]),    # 0 °C base
-    (273.15 + 15,  [1, 2, 5, 10, 20, 30]),# 15 °C base
-    (273.15 + 30,  [1, 2, 5, 10, 20, 30]),# 30 °C base
+    (273.15 + 0, [1, 2, 5, 10, 20]),  # 0 °C base
+    (273.15 + 15, [1, 2, 5, 10, 20, 30]),  # 15 °C base
+    (273.15 + 30, [1, 2, 5, 10, 20, 30]),  # 30 °C base
 ]
 
 
 # ===========================================================================
 # Section 1 – Basic sanity / physical constraints
 # ===========================================================================
+
 
 class TestPhysicalConstraints:
     """The LCL temperature must obey fundamental physical laws."""
@@ -133,6 +134,7 @@ class TestPhysicalConstraints:
 # Section 2 – Monotonicity / sensitivity
 # ===========================================================================
 
+
 class TestMonotonicity:
     """Increasing the dewpoint depression must lower T_LCL."""
 
@@ -172,6 +174,7 @@ class TestMonotonicity:
 # Section 3 – Numerical precision / known analytical values
 # ===========================================================================
 
+
 class TestNumericalValues:
     """Spot-check output against hand-computed Bolton (1980) eq. 15 values."""
 
@@ -210,7 +213,9 @@ class TestNumericalValues:
 # Section 4 – Cross-validation against MetPy
 # ===========================================================================
 
-metpy = pytest.importorskip("metpy", reason="MetPy not installed – skipping cross-validation")
+metpy = pytest.importorskip(
+    "metpy", reason="MetPy not installed – skipping cross-validation"
+)
 
 
 class TestMetPyCrossValidation:
@@ -222,7 +227,7 @@ class TestMetPyCrossValidation:
     for edge cases near the limits of the Bolton approximation.
     """
 
-    TOLERANCE_K = 1.5   # Bolton's stated accuracy for eq. 15
+    TOLERANCE_K = 1.5  # Bolton's stated accuracy for eq. 15
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_agrees_with_metpy(self, label, pressure, temp_k, dewpoint_k):
@@ -250,8 +255,8 @@ class TestMetPyCrossValidation:
     def test_tropical_conditions_close_to_metpy(self):
         """High-temp, high-humidity conditions (tropics) – tighter spot-check."""
         cases = [
-            (1010.0, 303.15, 301.15),   # 30 °C / 28 °C  – very humid
-            (1010.0, 308.15, 305.15),   # 35 °C / 32 °C
+            (1010.0, 303.15, 301.15),  # 30 °C / 28 °C  – very humid
+            (1010.0, 308.15, 305.15),  # 35 °C / 32 °C
         ]
         for p, t, td in cases:
             bolton = _bolton_lcl_temp_scalar(t, td)
@@ -300,6 +305,7 @@ class TestMetPyCrossValidation:
 # Section 5 – Edge / boundary cases
 # ===========================================================================
 
+
 class TestEdgeCases:
     """Push toward (but not past) the valid domain boundaries."""
 
@@ -311,8 +317,8 @@ class TestEdgeCases:
 
     def test_large_depression_stays_physical(self):
         """30 K depression – dry continental air; still expect a valid result."""
-        t = 303.15      # 30 °C
-        td = 273.15     # 0 °C
+        t = 303.15  # 30 °C
+        td = 273.15  # 0 °C
         t_lcl = _bolton_lcl_temp_scalar(t, td)
         assert math.isfinite(t_lcl)
         assert t_lcl <= t
@@ -351,6 +357,7 @@ class TestEdgeCases:
 # Section 6 – Regression guard
 # ===========================================================================
 
+
 class TestRegression:
     """
     Hard-coded regression values computed once from the Bolton formula.
@@ -370,8 +377,9 @@ class TestRegression:
         result = _bolton_lcl_temp_scalar(temp_k, dewpoint_k)
         assert abs(result - expected) < tol, (
             f"T={temp_k}, Td={dewpoint_k}: got {result:.4f} K, "
-            f"expected {expected:.4f} K (Δ={abs(result-expected):.4f} K)"
+            f"expected {expected:.4f} K (Δ={abs(result - expected):.4f} K)"
         )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

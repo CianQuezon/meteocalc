@@ -14,7 +14,6 @@ Test sections
 """
 
 import pytest
-import numpy as np
 
 from meteocalc.lcl._enums import LclEquationName
 from meteocalc.lcl._lcl_equation import (
@@ -27,10 +26,10 @@ from meteocalc.lcl.core import Lcl
 from meteocalc.shared.constants import eps
 from meteocalc.vapor.core import Vapor
 
-
 # ===========================================================================
 # Section 1 — Lcl.get_equations_available
 # ===========================================================================
+
 
 class TestGetEquationsAvailable:
     """
@@ -62,6 +61,7 @@ class TestGetEquationsAvailable:
     def test_each_name_parseable_as_enum(self):
         """Every returned name must round-trip through ``LclEquationName``."""
         from meteocalc.shared._enum_tools import parse_enum
+
         for name in Lcl.get_equations_available():
             enum_val = parse_enum(name, LclEquationName)
             assert isinstance(enum_val, LclEquationName), (
@@ -71,11 +71,10 @@ class TestGetEquationsAvailable:
     def test_each_name_registered_in_equation_map(self):
         """Every returned name must have an entry in ``LCL_EQUATION_MAP``."""
         from meteocalc.shared._enum_tools import parse_enum
+
         for name in Lcl.get_equations_available():
             key = parse_enum(name, LclEquationName)
-            assert key in LCL_EQUATION_MAP, (
-                f"'{name}' not found in LCL_EQUATION_MAP"
-            )
+            assert key in LCL_EQUATION_MAP, f"'{name}' not found in LCL_EQUATION_MAP"
 
     def test_no_duplicates(self):
         names = Lcl.get_equations_available()
@@ -83,7 +82,7 @@ class TestGetEquationsAvailable:
 
     def test_stable_across_calls(self):
         """Repeated calls must return identical lists."""
-        first  = Lcl.get_equations_available()
+        first = Lcl.get_equations_available()
         second = Lcl.get_equations_available()
         assert first == second
 
@@ -96,6 +95,7 @@ class TestGetEquationsAvailable:
 # ===========================================================================
 # Section 2 — Lcl.get_equation
 # ===========================================================================
+
 
 class TestGetEquation:
     """
@@ -127,7 +127,9 @@ class TestGetEquation:
         assert Lcl.get_equation("bolton") is Lcl.get_equation(LclEquationName.BOLTON)
 
     def test_string_and_enum_return_same_class_iterative(self):
-        assert Lcl.get_equation("iterative") is Lcl.get_equation(LclEquationName.ITERATIVE)
+        assert Lcl.get_equation("iterative") is Lcl.get_equation(
+            LclEquationName.ITERATIVE
+        )
 
     # ---- All registered equations ------------------------------------------
 
@@ -143,30 +145,33 @@ class TestGetEquation:
         assert issubclass(Lcl.get_equation("bolton"), LiftingCondensationLevelEquation)
 
     def test_iterative_class_is_subclass_of_base(self):
-        assert issubclass(Lcl.get_equation("iterative"), LiftingCondensationLevelEquation)
+        assert issubclass(
+            Lcl.get_equation("iterative"), LiftingCondensationLevelEquation
+        )
 
     # ---- Instantiability and calculate interface ---------------------------
 
     def test_bolton_class_is_instantiable(self):
-        cls      = Lcl.get_equation("bolton")
+        cls = Lcl.get_equation("bolton")
         instance = cls()
         assert isinstance(instance, BoltonLclEquation)
 
     def test_iterative_class_is_instantiable(self):
-        cls      = Lcl.get_equation("iterative")
+        cls = Lcl.get_equation("iterative")
         instance = cls()
         assert isinstance(instance, IterativeLclEquation)
 
     def test_retrieved_bolton_class_can_calculate(self):
         """Instantiate and call ``calculate`` — must produce finite results."""
-        cls           = Lcl.get_equation("bolton")
-        eq            = cls()
-        t_lcl, p_lcl  = eq.calculate(
+        cls = Lcl.get_equation("bolton")
+        eq = cls()
+        t_lcl, p_lcl = eq.calculate(
             temp_k=293.15, dewpoint_temp_k=285.15, pressure_hpa=1013.25
         )
         assert isinstance(t_lcl, float)
         assert isinstance(p_lcl, float)
         import math
+
         assert math.isfinite(t_lcl)
         assert math.isfinite(p_lcl)
         assert t_lcl <= 293.15
@@ -174,11 +179,11 @@ class TestGetEquation:
 
     def test_retrieved_iterative_class_can_calculate(self):
         """Instantiate and call ``calculate`` with a vapour equation — must produce finite results."""
-        cls       = Lcl.get_equation("iterative")
-        eq        = cls()
-        vapor_eq  = Vapor.get_equation("goff_gratch", phase="water")
-        e         = float(vapor_eq.calculate(285.15))
-        w         = eps * e / (1013.25 - e)
+        cls = Lcl.get_equation("iterative")
+        eq = cls()
+        vapor_eq = Vapor.get_equation("goff_gratch", phase="water")
+        e = float(vapor_eq.calculate(285.15))
+        w = eps * e / (1013.25 - e)
         t_lcl, p_lcl = eq.calculate(
             temp_k=293.15,
             dewpoint_temp_k=285.15,
@@ -187,6 +192,7 @@ class TestGetEquation:
             vapor_equation=vapor_eq,
         )
         import math
+
         assert math.isfinite(t_lcl)
         assert math.isfinite(p_lcl)
         assert t_lcl <= 293.15

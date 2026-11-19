@@ -16,19 +16,22 @@ calculations — any routing error silently produces wrong results for
 some input shapes.
 """
 
+from typing import Tuple
+
 import numpy as np
 import numpy.typing as npt
 import pytest
-from unittest.mock import MagicMock, call
-from typing import Tuple
 
-from meteocalc.lcl._lcl_equation import BoltonLclEquation, LiftingCondensationLevelEquation
 from meteocalc.lcl._jit_equations import _bolton_lcl_scalar, _bolton_lcl_vectorised
-
+from meteocalc.lcl._lcl_equation import (
+    BoltonLclEquation,
+    LiftingCondensationLevelEquation,
+)
 
 # ---------------------------------------------------------------------------
 # ---- Fixtures -------------------------------------------------------------
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def lcl_eq() -> LiftingCondensationLevelEquation:
@@ -51,8 +54,14 @@ def _vector_mock(
     return np.full(n, 283.35), np.full(n, 917.23)
 
 
-def _dispatch(eq, temp_k, dewpoint_k, pressure_hpa,
-              scalar_func=_scalar_mock, vector_func=_vector_mock):
+def _dispatch(
+    eq,
+    temp_k,
+    dewpoint_k,
+    pressure_hpa,
+    scalar_func=_scalar_mock,
+    vector_func=_vector_mock,
+):
     """Shorthand for calling _dispatch_scalar_or_vectorised."""
     return eq._dispatch_scalar_or_vectorised(
         temp_k=temp_k,
@@ -66,6 +75,7 @@ def _dispatch(eq, temp_k, dewpoint_k, pressure_hpa,
 # ===========================================================================
 # Section 1 — Routing correctness
 # ===========================================================================
+
 
 class TestRoutingCorrectness:
     """scalar_func called for scalar inputs, vector_func for array inputs."""
@@ -86,7 +96,9 @@ class TestRoutingCorrectness:
         _dispatch(lcl_eq, 293.15, 285.15, 1013.25, scalar_func, vector_func)
 
         assert len(scalar_called) == 1, "scalar_func must be called exactly once"
-        assert len(vector_called) == 0, "vector_func must not be called for scalar input"
+        assert len(vector_called) == 0, (
+            "vector_func must not be called for scalar input"
+        )
 
     def test_array_input_calls_vector_func(self, lcl_eq):
         """Array inputs must route to vector_func."""
@@ -106,7 +118,8 @@ class TestRoutingCorrectness:
             np.array([293.15, 303.15]),
             np.array([285.15, 298.15]),
             np.array([1013.25, 1000.0]),
-            scalar_func, vector_func,
+            scalar_func,
+            vector_func,
         )
 
         assert len(vector_called) == 1, "vector_func must be called exactly once"
@@ -122,10 +135,11 @@ class TestRoutingCorrectness:
 
         _dispatch(
             lcl_eq,
-            np.array([293.15, 303.15]),   # array
-            285.15,                        # scalar
-            1013.25,                       # scalar
-            _scalar_mock, vector_func,
+            np.array([293.15, 303.15]),  # array
+            285.15,  # scalar
+            1013.25,  # scalar
+            _scalar_mock,
+            vector_func,
         )
 
         assert len(vector_called) == 1
@@ -140,10 +154,11 @@ class TestRoutingCorrectness:
 
         _dispatch(
             lcl_eq,
-            np.array([293.15]),   # single-element array — not scalar
+            np.array([293.15]),  # single-element array — not scalar
             285.15,
             1013.25,
-            _scalar_mock, vector_func,
+            _scalar_mock,
+            vector_func,
         )
 
         assert len(vector_called) == 1
@@ -153,14 +168,17 @@ class TestRoutingCorrectness:
 # Section 2 — Scalar return types
 # ===========================================================================
 
+
 class TestScalarReturnTypes:
     """Scalar inputs must return Python floats, not numpy types."""
 
     def test_scalar_input_returns_python_floats(self, lcl_eq):
         """Scalar inputs must return Python float, not numpy scalar."""
         lcl_temp, lcl_pressure = _dispatch(lcl_eq, 293.15, 285.15, 1013.25)
-        assert isinstance(lcl_temp,     float), f"Expected float, got {type(lcl_temp)}"
-        assert isinstance(lcl_pressure, float), f"Expected float, got {type(lcl_pressure)}"
+        assert isinstance(lcl_temp, float), f"Expected float, got {type(lcl_temp)}"
+        assert isinstance(lcl_pressure, float), (
+            f"Expected float, got {type(lcl_pressure)}"
+        )
 
     def test_scalar_input_returns_two_values(self, lcl_eq):
         """Scalar dispatch must return exactly two values."""
@@ -175,37 +193,38 @@ class TestScalarReturnTypes:
         received_types = {}
 
         def scalar_func(temp_k, dewpoint_temp_k, pressure_hpa):
-            received_types["temp_k"]         = type(temp_k)
+            received_types["temp_k"] = type(temp_k)
             received_types["dewpoint_temp_k"] = type(dewpoint_temp_k)
-            received_types["pressure_hpa"]   = type(pressure_hpa)
+            received_types["pressure_hpa"] = type(pressure_hpa)
             return 283.35, 917.23
 
         _dispatch(lcl_eq, 293.15, 285.15, 1013.25, scalar_func, _vector_mock)
 
-        assert received_types["temp_k"]          is float
+        assert received_types["temp_k"] is float
         assert received_types["dewpoint_temp_k"] is float
-        assert received_types["pressure_hpa"]    is float
+        assert received_types["pressure_hpa"] is float
 
     def test_scalar_values_passed_correctly(self, lcl_eq):
         """scalar_func must receive the exact input values."""
         received = {}
 
         def scalar_func(temp_k, dewpoint_temp_k, pressure_hpa):
-            received["temp_k"]         = temp_k
+            received["temp_k"] = temp_k
             received["dewpoint_temp_k"] = dewpoint_temp_k
-            received["pressure_hpa"]   = pressure_hpa
+            received["pressure_hpa"] = pressure_hpa
             return 283.35, 917.23
 
         _dispatch(lcl_eq, 293.15, 285.15, 1013.25, scalar_func, _vector_mock)
 
-        assert received["temp_k"]          == 293.15
+        assert received["temp_k"] == 293.15
         assert received["dewpoint_temp_k"] == 285.15
-        assert received["pressure_hpa"]    == 1013.25
+        assert received["pressure_hpa"] == 1013.25
 
 
 # ===========================================================================
 # Section 3 — Array return types and shape
 # ===========================================================================
+
 
 class TestArrayReturnTypes:
     """Array inputs must return ndarrays with correct shape and dtype."""
@@ -218,7 +237,7 @@ class TestArrayReturnTypes:
             np.array([285.15, 298.15]),
             np.array([1013.25, 1000.0]),
         )
-        assert isinstance(lcl_temp,     np.ndarray)
+        assert isinstance(lcl_temp, np.ndarray)
         assert isinstance(lcl_pressure, np.ndarray)
 
     def test_array_output_shape_matches_input(self, lcl_eq):
@@ -230,7 +249,7 @@ class TestArrayReturnTypes:
             np.full(n, 285.15),
             np.full(n, 1013.25),
         )
-        assert lcl_temp.shape    == (n,)
+        assert lcl_temp.shape == (n,)
         assert lcl_pressure.shape == (n,)
 
     def test_array_returns_two_values(self, lcl_eq):
@@ -256,8 +275,9 @@ class TestArrayReturnTypes:
             lambda temp_k, dewpoint_temp_k, pressure_hpa: (
                 np.full(len(temp_k), 283.35),
                 np.full(len(temp_k), 917.23),
-            ))
-        assert lcl_temp.shape    == (n,)
+            ),
+        )
+        assert lcl_temp.shape == (n,)
         assert lcl_pressure.shape == (n,)
 
 
@@ -265,18 +285,22 @@ class TestArrayReturnTypes:
 # Section 4 — N-dimensional shape preservation
 # ===========================================================================
 
+
 class TestNDimensionalShapePreservation:
     """
     N-dimensional inputs must be flattened for vector_func then reshaped
     to the original shape on output.
     """
 
-    @pytest.mark.parametrize("shape", [
-        (3,),
-        (2, 3),
-        (2, 3, 4),
-        (5, 5),
-    ])
+    @pytest.mark.parametrize(
+        "shape",
+        [
+            (3,),
+            (2, 3),
+            (2, 3, 4),
+            (5, 5),
+        ],
+    )
     def test_nd_output_shape_matches_input(self, lcl_eq, shape):
         """Output shape must match N-D input shape."""
         n = int(np.prod(shape))
@@ -293,7 +317,7 @@ class TestNDimensionalShapePreservation:
             vector_func,
         )
 
-        assert lcl_temp.shape    == shape, f"Expected {shape}, got {lcl_temp.shape}"
+        assert lcl_temp.shape == shape, f"Expected {shape}, got {lcl_temp.shape}"
         assert lcl_pressure.shape == shape
 
     def test_vector_func_receives_1d_array(self, lcl_eq):
@@ -304,28 +328,28 @@ class TestNDimensionalShapePreservation:
         received_shapes = {}
 
         def vector_func(temp_k, dewpoint_temp_k, pressure_hpa):
-            received_shapes["temp_k"]          = temp_k.ndim
+            received_shapes["temp_k"] = temp_k.ndim
             received_shapes["dewpoint_temp_k"] = dewpoint_temp_k.ndim
-            received_shapes["pressure_hpa"]    = pressure_hpa.ndim
+            received_shapes["pressure_hpa"] = pressure_hpa.ndim
             return np.full(len(temp_k), 283.35), np.full(len(temp_k), 917.23)
 
         _dispatch(
             lcl_eq,
-            np.full((3, 4), 293.15),    # 2-D input
+            np.full((3, 4), 293.15),  # 2-D input
             np.full((3, 4), 285.15),
             np.full((3, 4), 1013.25),
             _scalar_mock,
             vector_func,
         )
 
-        assert received_shapes["temp_k"]          == 1, "temp_k must be 1-D in vector_func"
+        assert received_shapes["temp_k"] == 1, "temp_k must be 1-D in vector_func"
         assert received_shapes["dewpoint_temp_k"] == 1
-        assert received_shapes["pressure_hpa"]    == 1
+        assert received_shapes["pressure_hpa"] == 1
 
     def test_nd_element_count_correct(self, lcl_eq):
         """vector_func must receive arrays with n_elements = product of shape."""
         shape = (3, 4)
-        n     = 3 * 4
+        n = 3 * 4
         received_lengths = {}
 
         def vector_func(temp_k, dewpoint_temp_k, pressure_hpa):
@@ -348,6 +372,7 @@ class TestNDimensionalShapePreservation:
 # Section 5 — Physics correctness with real JIT functions
 # ===========================================================================
 
+
 class TestPhysicsWithRealFunctions:
     """
     Dispatch with the real Bolton JIT functions must produce
@@ -363,16 +388,16 @@ class TestPhysicsWithRealFunctions:
             scalar_func=_bolton_lcl_scalar,
             vector_func=_bolton_lcl_vectorised,
         )
-        assert isinstance(lcl_temp,     float)
+        assert isinstance(lcl_temp, float)
         assert isinstance(lcl_pressure, float)
         assert np.isfinite(lcl_temp)
         assert np.isfinite(lcl_pressure)
-        assert lcl_temp     <= 293.15
+        assert lcl_temp <= 293.15
         assert lcl_pressure <= 1013.25
 
     def test_array_dispatch_with_bolton(self, lcl_eq):
         """Real Bolton vector function must produce finite, physical results."""
-        temp_arr     = np.array([293.15, 303.15, 283.15])
+        temp_arr = np.array([293.15, 303.15, 283.15])
         dewpoint_arr = np.array([285.15, 298.15, 278.15])
         pressure_arr = np.full(3, 1013.25)
 
@@ -384,13 +409,13 @@ class TestPhysicsWithRealFunctions:
             vector_func=_bolton_lcl_vectorised,
         )
 
-        assert isinstance(lcl_temp,     np.ndarray)
+        assert isinstance(lcl_temp, np.ndarray)
         assert isinstance(lcl_pressure, np.ndarray)
-        assert lcl_temp.shape    == (3,)
+        assert lcl_temp.shape == (3,)
         assert lcl_pressure.shape == (3,)
         assert np.all(np.isfinite(lcl_temp))
         assert np.all(np.isfinite(lcl_pressure))
-        assert np.all(lcl_temp     <= temp_arr)
+        assert np.all(lcl_temp <= temp_arr)
         assert np.all(lcl_pressure <= pressure_arr)
 
     def test_scalar_array_consistency(self, lcl_eq):
@@ -423,6 +448,7 @@ class TestPhysicsWithRealFunctions:
 # Section 6 — Edge cases
 # ===========================================================================
 
+
 class TestEdgeCases:
     """Boundary and unusual inputs."""
 
@@ -437,10 +463,7 @@ class TestEdgeCases:
 
     def test_dispatch_deterministic(self, lcl_eq):
         """Same inputs must produce identical outputs on repeated calls."""
-        results = [
-            _dispatch(lcl_eq, 293.15, 285.15, 1013.25)
-            for _ in range(5)
-        ]
+        results = [_dispatch(lcl_eq, 293.15, 285.15, 1013.25) for _ in range(5)]
         for t, p in results:
             assert t == results[0][0]
             assert p == results[0][1]
@@ -457,14 +480,14 @@ class TestEdgeCases:
 
         lcl_temp, lcl_pressure = _dispatch(
             lcl_eq,
-            np.full(n, 293.15),   # array shape (4,)
-            285.15,               # scalar — broadcast to (4,)
-            1013.25,              # scalar — broadcast to (4,)
+            np.full(n, 293.15),  # array shape (4,)
+            285.15,  # scalar — broadcast to (4,)
+            1013.25,  # scalar — broadcast to (4,)
             _scalar_mock,
             vector_func,
         )
 
-        assert lcl_temp.shape    == (n,)
+        assert lcl_temp.shape == (n,)
         assert lcl_pressure.shape == (n,)
 
 
