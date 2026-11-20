@@ -48,7 +48,7 @@ def _magnus_equation_scalar(temp_k: float, rh: float, A: float, B: float) -> flo
     return td_c + 273.15
 
 
-@njit(parallel=True, fastmath=True)
+@njit(parallel=True)
 def _magnus_equation_vectorised(
     temp_k: npt.ArrayLike, rh: npt.ArrayLike, A: float, B: float
 ) -> npt.NDArray:

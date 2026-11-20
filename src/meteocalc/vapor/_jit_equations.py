@@ -34,7 +34,7 @@ def _bolton_scalar(temp_k: float) -> float:
     return float(6.112 * np.exp((17.67 * temp_c) / (temp_c + 243.5)))
 
 
-@njit(parallel=True, fastmath=True)
+@njit(parallel=True)
 def _bolton_vectorised(temp_k: npt.ArrayLike) -> npt.NDArray[np.float64]:
     """Calculate saturation vapor pressure arrays using Bolton's equation.
 
@@ -107,7 +107,7 @@ def _goff_gratch_scalar(
     return float(10**log_ew)
 
 
-@njit(parallel=True, fastmath=True)
+@njit(parallel=True)
 def _goff_gratch_vectorised(
     temp_k: npt.ArrayLike,
     T_ref: float,
@@ -193,7 +193,7 @@ def _hyland_wexler_scalar(
     return float(np.exp(ln_ew) / 100)
 
 
-@njit(parallel=True, fastmath=True)
+@njit(parallel=True)
 def _hyland_wexler_vectorised(
     temp_k: npt.ArrayLike,
     A: float,
