@@ -24,6 +24,7 @@ Test sections
 8.  Enum / string API — calculation_method accepts string and enum
 9.  Monotonicity — depression sweep, surface temperature sweep
 10. Edge cases
+11. Required mixing_ratio — solver path with ``None`` raises ``TypeError``
 """
 
 import math
@@ -32,7 +33,7 @@ import warnings
 import numpy as np
 import pytest
 
-from meteocalc.lcl._enums import CalculationMethod, LclEquationName
+from meteocalc.lcl._enums import CalculationMethod
 from meteocalc.lcl.core import Lcl
 from meteocalc.shared.constants import Rd, cpd, eps
 from meteocalc.vapor.core import Vapor
@@ -41,7 +42,9 @@ from meteocalc.vapor.core import Vapor
 # ---- MetPy skip guard -------------------------------------------------------
 # ---------------------------------------------------------------------------
 
-metpy = pytest.importorskip("metpy", reason="MetPy not installed — skipping MetPy tests")
+metpy = pytest.importorskip(
+    "metpy", reason="MetPy not installed — skipping MetPy tests"
+)
 
 
 def _metpy_lcl(pressure_hpa: float, temp_k: float, dewpoint_k: float):
@@ -51,8 +54,8 @@ def _metpy_lcl(pressure_hpa: float, temp_k: float, dewpoint_k: float):
 
     lcl_p, lcl_t = lcl(
         pressure_hpa * units.hPa,
-        temp_k       * units.kelvin,
-        dewpoint_k   * units.kelvin,
+        temp_k * units.kelvin,
+        dewpoint_k * units.kelvin,
     )
     return (
         float(lcl_t.to("kelvin").magnitude),
@@ -63,6 +66,7 @@ def _metpy_lcl(pressure_hpa: float, temp_k: float, dewpoint_k: float):
 # ---------------------------------------------------------------------------
 # ---- Helpers ----------------------------------------------------------------
 # ---------------------------------------------------------------------------
+
 
 def _w(dewpoint_k: float, pressure_hpa: float, vapor_eq=None) -> float:
     if vapor_eq is None:
@@ -97,14 +101,14 @@ def _lcl(temp_k, dewpoint_k, pressure_hpa, mixing_ratio=None, **kwargs):
 
 # (label, pressure_hpa, temp_k, dewpoint_k)
 STANDARD_CASES = [
-    ("standard_midlat",    1013.25, 293.15, 285.15),
-    ("warm_humid",         1000.0,  303.15, 298.15),
-    ("cool_dry",           1013.25, 278.15, 268.15),
-    ("near_saturated",     1013.25, 290.15, 289.15),
-    ("high_elevation",     850.0,   285.15, 278.15),
-    ("summer_continental", 1000.0,  300.15, 290.15),
-    ("autumn_uk",          1013.25, 283.15, 278.15),
-    ("moderate_dry",       1013.25, 295.15, 282.15),
+    ("standard_midlat", 1013.25, 293.15, 285.15),
+    ("warm_humid", 1000.0, 303.15, 298.15),
+    ("cool_dry", 1013.25, 278.15, 268.15),
+    ("near_saturated", 1013.25, 290.15, 289.15),
+    ("high_elevation", 850.0, 285.15, 278.15),
+    ("summer_continental", 1000.0, 300.15, 290.15),
+    ("autumn_uk", 1013.25, 283.15, 278.15),
+    ("moderate_dry", 1013.25, 295.15, 282.15),
 ]
 
 DEPRESSION_SWEEP = [
@@ -112,17 +116,22 @@ DEPRESSION_SWEEP = [
     (273.15 + 25, [1, 2, 5, 10, 15]),
 ]
 
+
 # Bolton tiered tolerances (for MetPy comparisons on the approximation path)
 def _bolton_tol(depression: float) -> float:
-    if depression < 3.0:   return 0.3
-    elif depression < 10.0: return 0.8
-    elif depression < 20.0: return 1.5
+    if depression < 3.0:
+        return 0.3
+    elif depression < 10.0:
+        return 0.8
+    elif depression < 20.0:
+        return 1.5
     return 2.5
 
 
 # ===========================================================================
 # Section 1 — Routing
 # ===========================================================================
+
 
 class TestRouting:
     """
@@ -134,7 +143,7 @@ class TestRouting:
     def test_default_routes_to_approximation(self):
         """Omitting ``calculation_method`` must equal explicit ``'approximation'``."""
         t_default, p_default = Lcl.get_lcl(293.15, 285.15, 1013.25)
-        t_approx,  p_approx  = Lcl.get_lcl(
+        t_approx, p_approx = Lcl.get_lcl(
             293.15, 285.15, 1013.25, calculation_method="approximation"
         )
         assert t_default == t_approx
@@ -153,34 +162,49 @@ class TestRouting:
     def test_solver_result_matches_direct_path(self):
         w = _w(285.15, 1013.25)
         t_disp, p_disp = Lcl.get_lcl(
-            293.15, 285.15, 1013.25,
+            293.15,
+            285.15,
+            1013.25,
             mixing_ratio=w,
             lcl_equation_name="iterative",
             calculation_method="solver",
         )
         t_direct, p_direct = Lcl.get_lcl_using_solver(
-            temp_k=293.15, dewpoint_temp_k=285.15, pressure_hpa=1013.25,
+            temp_k=293.15,
+            dewpoint_temp_k=285.15,
+            pressure_hpa=1013.25,
             mixing_ratio=w,
         )
         assert t_disp == t_direct
         assert p_disp == p_direct
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
-    def test_approximation_path_matches_direct_all_cases(self, label, pressure, temp_k, dewpoint_k):
-        t_d, p_d = Lcl.get_lcl(temp_k, dewpoint_k, pressure, calculation_method="approximation")
+    def test_approximation_path_matches_direct_all_cases(
+        self, label, pressure, temp_k, dewpoint_k
+    ):
+        t_d, p_d = Lcl.get_lcl(
+            temp_k, dewpoint_k, pressure, calculation_method="approximation"
+        )
         t_r, p_r = Lcl.get_lcl_using_approximation(temp_k, dewpoint_k, pressure)
         assert t_d == t_r, f"[{label}] T: dispatcher={t_d:.8f}  direct={t_r:.8f}"
         assert p_d == p_r, f"[{label}] P: dispatcher={p_d:.8f}  direct={p_r:.8f}"
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
-    def test_solver_path_matches_direct_all_cases(self, label, pressure, temp_k, dewpoint_k):
+    def test_solver_path_matches_direct_all_cases(
+        self, label, pressure, temp_k, dewpoint_k
+    ):
         w = _w(dewpoint_k, pressure)
         t_d, p_d = Lcl.get_lcl(
-            temp_k, dewpoint_k, pressure,
-            mixing_ratio=w, lcl_equation_name="iterative",
+            temp_k,
+            dewpoint_k,
+            pressure,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
             calculation_method="solver",
         )
-        t_r, p_r = Lcl.get_lcl_using_solver(temp_k, dewpoint_k, pressure, mixing_ratio=w)
+        t_r, p_r = Lcl.get_lcl_using_solver(
+            temp_k, dewpoint_k, pressure, mixing_ratio=w
+        )
         assert t_d == t_r, f"[{label}] T: dispatcher={t_d:.8f}  direct={t_r:.8f}"
         assert p_d == p_r, f"[{label}] P: dispatcher={p_d:.8f}  direct={p_r:.8f}"
 
@@ -189,11 +213,13 @@ class TestRouting:
 # Section 2 — Default arguments
 # ===========================================================================
 
-class TestDefaultArguments:
 
+class TestDefaultArguments:
     def test_default_calculation_method_is_approximation(self):
         t1, p1 = Lcl.get_lcl(293.15, 285.15, 1013.25)
-        t2, p2 = Lcl.get_lcl(293.15, 285.15, 1013.25, calculation_method="approximation")
+        t2, p2 = Lcl.get_lcl(
+            293.15, 285.15, 1013.25, calculation_method="approximation"
+        )
         assert t1 == t2 and p1 == p2
 
     def test_default_lcl_equation_name_is_bolton(self):
@@ -204,12 +230,20 @@ class TestDefaultArguments:
     def test_default_vapor_equation_is_goff_gratch_for_solver(self):
         w = _w(285.15, 1013.25)
         t1, p1 = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         t2, p2 = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
             vapor_equation_name="goff_gratch",
         )
         assert t1 == t2 and p1 == p2
@@ -217,12 +251,20 @@ class TestDefaultArguments:
     def test_default_surface_type_is_automatic_for_solver(self):
         w = _w(285.15, 1013.25)
         t1, p1 = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         t2, p2 = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
             surface_type="automatic",
         )
         assert t1 == t2 and p1 == p2
@@ -231,6 +273,7 @@ class TestDefaultArguments:
 # ===========================================================================
 # Section 3 — Warning behaviour
 # ===========================================================================
+
 
 class TestWarningBehaviour:
     """
@@ -242,7 +285,9 @@ class TestWarningBehaviour:
         w = _w(285.15, 1013.25)
         with pytest.warns(UserWarning, match="bolton"):
             Lcl.get_lcl(
-                293.15, 285.15, 1013.25,
+                293.15,
+                285.15,
+                1013.25,
                 mixing_ratio=w,
                 lcl_equation_name="bolton",
                 calculation_method="solver",
@@ -254,7 +299,9 @@ class TestWarningBehaviour:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             t_warn, p_warn = Lcl.get_lcl(
-                293.15, 285.15, 1013.25,
+                293.15,
+                285.15,
+                1013.25,
                 mixing_ratio=w,
                 lcl_equation_name="bolton",
                 calculation_method="solver",
@@ -271,7 +318,9 @@ class TestWarningBehaviour:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             Lcl.get_lcl(
-                293.15, 285.15, 1013.25,
+                293.15,
+                285.15,
+                1013.25,
                 mixing_ratio=w,
                 lcl_equation_name="iterative",
                 calculation_method="solver",
@@ -288,8 +337,8 @@ class TestWarningBehaviour:
 # Section 4 — Return types
 # ===========================================================================
 
-class TestReturnTypes:
 
+class TestReturnTypes:
     def test_scalar_returns_floats(self):
         t, p = Lcl.get_lcl(293.15, 285.15, 1013.25)
         assert isinstance(t, float)
@@ -299,26 +348,20 @@ class TestReturnTypes:
         assert len(Lcl.get_lcl(293.15, 285.15, 1013.25)) == 2
 
     def test_array_returns_ndarrays(self):
-        n    = 5
-        t, p = Lcl.get_lcl(
-            np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25)
-        )
+        n = 5
+        t, p = Lcl.get_lcl(np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25))
         assert isinstance(t, np.ndarray)
         assert isinstance(p, np.ndarray)
 
     def test_array_dtype_float64(self):
-        n    = 4
-        t, p = Lcl.get_lcl(
-            np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25)
-        )
+        n = 4
+        t, p = Lcl.get_lcl(np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25))
         assert t.dtype == np.float64
         assert p.dtype == np.float64
 
     def test_array_shape_matches_input(self):
-        n    = 7
-        t, p = Lcl.get_lcl(
-            np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25)
-        )
+        n = 7
+        t, p = Lcl.get_lcl(np.full(n, 293.15), np.full(n, 285.15), np.full(n, 1013.25))
         assert t.shape == (n,)
         assert p.shape == (n,)
 
@@ -331,14 +374,18 @@ class TestReturnTypes:
         assert abs(p_sc - float(p_ar[0])) < 1e-10
 
     def test_solver_path_array_returns_ndarrays(self):
-        n      = 4
-        t_a    = np.full(n, 293.15)
-        td_a   = np.full(n, 285.15)
-        p_a    = np.full(n, 1013.25)
-        w_a    = _w_arr(td_a, p_a)
-        t, p   = Lcl.get_lcl(
-            t_a, td_a, p_a, mixing_ratio=w_a,
-            lcl_equation_name="iterative", calculation_method="solver",
+        n = 4
+        t_a = np.full(n, 293.15)
+        td_a = np.full(n, 285.15)
+        p_a = np.full(n, 1013.25)
+        w_a = _w_arr(td_a, p_a)
+        t, p = Lcl.get_lcl(
+            t_a,
+            td_a,
+            p_a,
+            mixing_ratio=w_a,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         assert isinstance(t, np.ndarray)
         assert isinstance(p, np.ndarray)
@@ -349,22 +396,24 @@ class TestReturnTypes:
 # Section 5 — Physical constraints
 # ===========================================================================
 
-class TestPhysicalConstraints:
 
+class TestPhysicalConstraints:
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_approx_lcl_temp_below_surface(self, label, pressure, temp_k, dewpoint_k):
         t_lcl, _ = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
         assert t_lcl <= temp_k + 1e-9, f"[{label}] T_LCL={t_lcl:.4f} K > T_surface"
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
-    def test_approx_lcl_pressure_below_surface(self, label, pressure, temp_k, dewpoint_k):
+    def test_approx_lcl_pressure_below_surface(
+        self, label, pressure, temp_k, dewpoint_k
+    ):
         _, p_lcl = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
         assert p_lcl <= pressure + 1e-9, f"[{label}] P_LCL={p_lcl:.4f} > P_surface"
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_approx_poisson_relation(self, label, pressure, temp_k, dewpoint_k):
         t_lcl, p_lcl = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
-        expected_p   = pressure * (t_lcl / temp_k) ** (cpd / Rd)
+        expected_p = pressure * (t_lcl / temp_k) ** (cpd / Rd)
         assert abs(p_lcl - expected_p) < 1e-6, (
             f"[{label}] Poisson: got {p_lcl:.6f} hPa, expected {expected_p:.6f} hPa"
         )
@@ -373,10 +422,16 @@ class TestPhysicalConstraints:
     def test_solver_lcl_temp_below_surface(self, label, pressure, temp_k, dewpoint_k):
         w = _w(dewpoint_k, pressure)
         t_lcl, _ = Lcl.get_lcl(
-            temp_k, dewpoint_k, pressure, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            temp_k,
+            dewpoint_k,
+            pressure,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
-        assert t_lcl <= temp_k + 1e-9, f"[{label}] Solver T_LCL={t_lcl:.4f} K > T_surface"
+        assert t_lcl <= temp_k + 1e-9, (
+            f"[{label}] Solver T_LCL={t_lcl:.4f} K > T_surface"
+        )
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_results_are_finite(self, label, pressure, temp_k, dewpoint_k):
@@ -389,6 +444,7 @@ class TestPhysicalConstraints:
 # Section 6 — Bit-identical consistency (array inputs)
 # ===========================================================================
 
+
 class TestBitIdenticalConsistency:
     """
     ``get_lcl`` must produce results identical to the direct path methods
@@ -396,7 +452,7 @@ class TestBitIdenticalConsistency:
     """
 
     def test_approx_array_matches_direct(self):
-        temp_arr     = np.array([c[2] for c in STANDARD_CASES])
+        temp_arr = np.array([c[2] for c in STANDARD_CASES])
         dewpoint_arr = np.array([c[3] for c in STANDARD_CASES])
         pressure_arr = np.array([c[1] for c in STANDARD_CASES])
 
@@ -407,14 +463,18 @@ class TestBitIdenticalConsistency:
         np.testing.assert_array_equal(p_d, p_r)
 
     def test_solver_array_matches_direct(self):
-        temp_arr     = np.array([c[2] for c in STANDARD_CASES])
+        temp_arr = np.array([c[2] for c in STANDARD_CASES])
         dewpoint_arr = np.array([c[3] for c in STANDARD_CASES])
         pressure_arr = np.array([c[1] for c in STANDARD_CASES])
-        w_arr        = _w_arr(dewpoint_arr, pressure_arr)
+        w_arr = _w_arr(dewpoint_arr, pressure_arr)
 
         t_d, p_d = Lcl.get_lcl(
-            temp_arr, dewpoint_arr, pressure_arr, mixing_ratio=w_arr,
-            lcl_equation_name="iterative", calculation_method="solver",
+            temp_arr,
+            dewpoint_arr,
+            pressure_arr,
+            mixing_ratio=w_arr,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         t_r, p_r = Lcl.get_lcl_using_solver(temp_arr, dewpoint_arr, pressure_arr, w_arr)
 
@@ -426,15 +486,15 @@ class TestBitIdenticalConsistency:
 # Section 7 — MetPy cross-validation
 # ===========================================================================
 
-class TestMetPyCrossValidation:
 
+class TestMetPyCrossValidation:
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_approximation_path_vs_metpy(self, label, pressure, temp_k, dewpoint_k):
         depression = temp_k - dewpoint_k
-        tol        = _bolton_tol(depression)
-        t_lcl, _   = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
+        tol = _bolton_tol(depression)
+        t_lcl, _ = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
         t_metpy, _ = _metpy_lcl(pressure, temp_k, dewpoint_k)
-        diff       = abs(t_lcl - t_metpy)
+        diff = abs(t_lcl - t_metpy)
         assert diff < tol, (
             f"[{label}] approx: got {t_lcl:.4f} K  MetPy {t_metpy:.4f} K  "
             f"Δ={diff:.4f} K  dep={depression:.1f} K  tol={tol} K"
@@ -442,13 +502,17 @@ class TestMetPyCrossValidation:
 
     @pytest.mark.parametrize("label,pressure,temp_k,dewpoint_k", STANDARD_CASES)
     def test_solver_path_vs_metpy(self, label, pressure, temp_k, dewpoint_k):
-        w          = _w(dewpoint_k, pressure)
-        t_lcl, _   = Lcl.get_lcl(
-            temp_k, dewpoint_k, pressure, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+        w = _w(dewpoint_k, pressure)
+        t_lcl, _ = Lcl.get_lcl(
+            temp_k,
+            dewpoint_k,
+            pressure,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         t_metpy, _ = _metpy_lcl(pressure, temp_k, dewpoint_k)
-        diff       = abs(t_lcl - t_metpy)
+        diff = abs(t_lcl - t_metpy)
         assert diff < 0.5, (
             f"[{label}] solver: got {t_lcl:.4f} K  MetPy {t_metpy:.4f} K  Δ={diff:.4f} K"
         )
@@ -457,13 +521,17 @@ class TestMetPyCrossValidation:
         """Approximation and solver must agree within Bolton's stated error."""
         for label, pressure, temp_k, dewpoint_k in STANDARD_CASES:
             depression = temp_k - dewpoint_k
-            tol        = _bolton_tol(depression)
-            w          = _w(dewpoint_k, pressure)
+            tol = _bolton_tol(depression)
+            w = _w(dewpoint_k, pressure)
 
             t_approx, _ = Lcl.get_lcl(temp_k, dewpoint_k, pressure)
             t_solver, _ = Lcl.get_lcl(
-                temp_k, dewpoint_k, pressure, mixing_ratio=w,
-                lcl_equation_name="iterative", calculation_method="solver",
+                temp_k,
+                dewpoint_k,
+                pressure,
+                mixing_ratio=w,
+                lcl_equation_name="iterative",
+                calculation_method="solver",
             )
             diff = abs(t_approx - t_solver)
             assert diff < tol, (
@@ -476,22 +544,34 @@ class TestMetPyCrossValidation:
 # Section 8 — Enum / string API for calculation_method
 # ===========================================================================
 
-class TestEnumStringAPI:
 
+class TestEnumStringAPI:
     def test_approximation_string_equals_enum(self):
-        t_s, p_s = Lcl.get_lcl(293.15, 285.15, 1013.25, calculation_method="approximation")
-        t_e, p_e = Lcl.get_lcl(293.15, 285.15, 1013.25, calculation_method=CalculationMethod.APPROXIMATION)
+        t_s, p_s = Lcl.get_lcl(
+            293.15, 285.15, 1013.25, calculation_method="approximation"
+        )
+        t_e, p_e = Lcl.get_lcl(
+            293.15, 285.15, 1013.25, calculation_method=CalculationMethod.APPROXIMATION
+        )
         assert t_s == t_e and p_s == p_e
 
     def test_solver_string_equals_enum(self):
         w = _w(285.15, 1013.25)
         t_s, p_s = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         t_e, p_e = Lcl.get_lcl(
-            293.15, 285.15, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method=CalculationMethod.SOLVER,
+            293.15,
+            285.15,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method=CalculationMethod.SOLVER,
         )
         assert t_s == t_e and p_s == p_e
 
@@ -504,8 +584,8 @@ class TestEnumStringAPI:
 # Section 9 — Monotonicity
 # ===========================================================================
 
-class TestMonotonicity:
 
+class TestMonotonicity:
     @pytest.mark.parametrize("base_temp,depressions", DEPRESSION_SWEEP)
     def test_approx_larger_depression_lowers_lcl_temp(self, base_temp, depressions):
         t_prev = None
@@ -520,10 +600,14 @@ class TestMonotonicity:
         t_prev = None
         for dep in sorted(depressions):
             td = base_temp - dep
-            w  = _w(td, 1013.25)
+            w = _w(td, 1013.25)
             t_lcl, _ = Lcl.get_lcl(
-                base_temp, td, 1013.25, mixing_ratio=w,
-                lcl_equation_name="iterative", calculation_method="solver",
+                base_temp,
+                td,
+                1013.25,
+                mixing_ratio=w,
+                lcl_equation_name="iterative",
+                calculation_method="solver",
             )
             if t_prev is not None:
                 assert t_lcl < t_prev
@@ -531,7 +615,7 @@ class TestMonotonicity:
 
     @pytest.mark.parametrize("depression", [2, 5, 10])
     def test_approx_warmer_parcel_warmer_lcl(self, depression):
-        temps  = [278.15, 283.15, 288.15, 293.15, 298.15]
+        temps = [278.15, 283.15, 288.15, 293.15, 298.15]
         t_prev = None
         for t in temps:
             t_lcl, _ = Lcl.get_lcl(t, t - depression, 1013.25)
@@ -544,8 +628,8 @@ class TestMonotonicity:
 # Section 10 — Edge cases
 # ===========================================================================
 
-class TestEdgeCases:
 
+class TestEdgeCases:
     def test_very_small_depression_approximation(self):
         t_lcl, p_lcl = Lcl.get_lcl(293.15, 292.65, 1013.25)
         assert math.isfinite(t_lcl)
@@ -554,8 +638,12 @@ class TestEdgeCases:
     def test_very_small_depression_solver(self):
         w = _w(292.65, 1013.25)
         t_lcl, p_lcl = Lcl.get_lcl(
-            293.15, 292.65, 1013.25, mixing_ratio=w,
-            lcl_equation_name="iterative", calculation_method="solver",
+            293.15,
+            292.65,
+            1013.25,
+            mixing_ratio=w,
+            lcl_equation_name="iterative",
+            calculation_method="solver",
         )
         assert math.isfinite(t_lcl)
         assert t_lcl <= 293.15
@@ -579,8 +667,12 @@ class TestEdgeCases:
         w = _w(285.15, 1013.25)
         results = [
             Lcl.get_lcl(
-                293.15, 285.15, 1013.25, mixing_ratio=w,
-                lcl_equation_name="iterative", calculation_method="solver",
+                293.15,
+                285.15,
+                1013.25,
+                mixing_ratio=w,
+                lcl_equation_name="iterative",
+                calculation_method="solver",
             )
             for _ in range(5)
         ]
@@ -588,16 +680,63 @@ class TestEdgeCases:
             assert t == results[0][0] and p == results[0][1]
 
     def test_large_random_array_approximation(self):
-        rng          = np.random.default_rng(42)
-        n            = 10_000
-        temp_k       = rng.uniform(280.0, 308.0, n)
-        dewpoint_k   = temp_k - rng.uniform(1.0, 10.0, n)
+        rng = np.random.default_rng(42)
+        n = 10_000
+        temp_k = rng.uniform(280.0, 308.0, n)
+        dewpoint_k = temp_k - rng.uniform(1.0, 10.0, n)
         pressure_hpa = rng.uniform(850.0, 1013.25, n)
         t_lcl, p_lcl = Lcl.get_lcl(temp_k, dewpoint_k, pressure_hpa)
         assert np.all(np.isfinite(t_lcl))
         assert np.all(np.isfinite(p_lcl))
         assert np.all(t_lcl <= temp_k + 1e-9)
         assert np.all(p_lcl <= pressure_hpa + 1e-9)
+
+
+# ---------------------------------------------------------------------------
+# ---- 11. Required mixing_ratio ----------------------------------------------
+# ---------------------------------------------------------------------------
+
+
+class TestMixingRatioRequired:
+    """
+    ``get_lcl`` defaults ``mixing_ratio`` to ``None`` and forwards it to the
+    solver path, so the solver's guard must surface as a ``TypeError`` here too.
+    The approximation path ignores ``mixing_ratio`` and must keep working.
+    """
+
+    def test_solver_with_default_mixing_ratio_raises(self):
+        with pytest.raises(TypeError, match="Mixing ratio is required"):
+            Lcl.get_lcl(
+                temp_k=293.15,
+                dewpoint_temp_k=285.15,
+                pressure_hpa=1013.25,
+                lcl_equation_name="iterative",
+                calculation_method="solver",
+            )
+
+    def test_solver_with_explicit_none_raises(self):
+        with pytest.raises(TypeError, match="Mixing ratio is required"):
+            Lcl.get_lcl(
+                293.15,
+                285.15,
+                1013.25,
+                mixing_ratio=None,
+                lcl_equation_name="iterative",
+                calculation_method=CalculationMethod.SOLVER,
+            )
+
+    def test_solver_bolton_fallback_still_raises(self):
+        """bolton + solver warns and falls back, then hits the same guard."""
+        with pytest.warns(UserWarning), pytest.raises(
+            TypeError, match="Mixing ratio is required"
+        ):
+            Lcl.get_lcl(293.15, 285.15, 1013.25, calculation_method="solver")
+
+    def test_approximation_does_not_need_mixing_ratio(self):
+        t_lcl, p_lcl = Lcl.get_lcl(293.15, 285.15, 1013.25, mixing_ratio=None)
+        assert math.isfinite(t_lcl)
+        assert t_lcl < 293.15
+        assert p_lcl < 1013.25
 
 
 if __name__ == "__main__":

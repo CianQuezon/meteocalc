@@ -17,15 +17,17 @@ to every calculation result.
 """
 
 import numpy as np
-import numpy.typing as npt
 import pytest
 
-from meteocalc.lcl._lcl_equation import BoltonLclEquation, LiftingCondensationLevelEquation
-
+from meteocalc.lcl._lcl_equation import (
+    BoltonLclEquation,
+    LiftingCondensationLevelEquation,
+)
 
 # ---------------------------------------------------------------------------
 # ---- Concrete fixture — BoltonLclEquation exposes _broadcast_input --------
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def lcl_eq() -> LiftingCondensationLevelEquation:
@@ -41,6 +43,7 @@ def _broadcast(eq, temp_k, dewpoint_k, pressure_hpa):
 # ===========================================================================
 # Section 1 — was_scalar detection
 # ===========================================================================
+
 
 class TestWasScalarDetection:
     """was_scalar must be True only when ALL inputs are scalar."""
@@ -62,9 +65,9 @@ class TestWasScalarDetection:
 
     def test_zero_d_numpy_array(self, lcl_eq):
         """0-d numpy arrays are scalars → was_scalar=True."""
-        t  = np.float64(293.15)
+        t = np.float64(293.15)
         td = np.float64(285.15)
-        p  = np.float64(1013.25)
+        p = np.float64(1013.25)
         _, _, _, was_scalar = _broadcast(lcl_eq, t, td, p)
         assert was_scalar is True
 
@@ -72,9 +75,9 @@ class TestWasScalarDetection:
         """One array input → was_scalar=False."""
         _, _, _, was_scalar = _broadcast(
             lcl_eq,
-            np.array([293.15]),   # array
-            285.15,               # scalar
-            1013.25,              # scalar
+            np.array([293.15]),  # array
+            285.15,  # scalar
+            1013.25,  # scalar
         )
         assert was_scalar is False
 
@@ -95,9 +98,7 @@ class TestWasScalarDetection:
 
     def test_single_element_array_gives_false(self, lcl_eq):
         """Single-element array is not scalar → was_scalar=False."""
-        _, _, _, was_scalar = _broadcast(
-            lcl_eq, np.array([293.15]), 285.15, 1013.25
-        )
+        _, _, _, was_scalar = _broadcast(lcl_eq, np.array([293.15]), 285.15, 1013.25)
         assert was_scalar is False
 
 
@@ -105,12 +106,20 @@ class TestWasScalarDetection:
 # Section 2 — dtype conversion
 # ===========================================================================
 
+
 class TestDtypeConversion:
     """All outputs must be float64 regardless of input dtype."""
 
-    @pytest.mark.parametrize("dtype", [
-        np.float32, np.float64, np.int32, np.int64, np.float16,
-    ])
+    @pytest.mark.parametrize(
+        "dtype",
+        [
+            np.float32,
+            np.float64,
+            np.int32,
+            np.int64,
+            np.float16,
+        ],
+    )
     def test_numpy_dtype_converted_to_float64(self, lcl_eq, dtype):
         """Any numpy numeric dtype must be converted to float64."""
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
@@ -119,15 +128,15 @@ class TestDtypeConversion:
             np.array([285.15], dtype=dtype),
             np.array([1013.25], dtype=dtype),
         )
-        assert temp_k.dtype      == np.float64, f"temp_k dtype={temp_k.dtype}"
-        assert dewpoint_k.dtype  == np.float64
+        assert temp_k.dtype == np.float64, f"temp_k dtype={temp_k.dtype}"
+        assert dewpoint_k.dtype == np.float64
         assert pressure_hpa.dtype == np.float64
 
     def test_python_int_converted_to_float64(self, lcl_eq):
         """Python int scalars must produce float64 output."""
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(lcl_eq, 293, 285, 1013)
-        assert temp_k.dtype      == np.float64
-        assert dewpoint_k.dtype  == np.float64
+        assert temp_k.dtype == np.float64
+        assert dewpoint_k.dtype == np.float64
         assert pressure_hpa.dtype == np.float64
 
     def test_python_float_converted_to_float64(self, lcl_eq):
@@ -135,8 +144,8 @@ class TestDtypeConversion:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq, 293.15, 285.15, 1013.25
         )
-        assert temp_k.dtype      == np.float64
-        assert dewpoint_k.dtype  == np.float64
+        assert temp_k.dtype == np.float64
+        assert dewpoint_k.dtype == np.float64
         assert pressure_hpa.dtype == np.float64
 
     def test_list_input_converted_to_float64(self, lcl_eq):
@@ -144,8 +153,8 @@ class TestDtypeConversion:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq, [293.15, 303.15], [285.15, 298.15], [1013.25, 1000.0]
         )
-        assert temp_k.dtype      == np.float64
-        assert dewpoint_k.dtype  == np.float64
+        assert temp_k.dtype == np.float64
+        assert dewpoint_k.dtype == np.float64
         assert pressure_hpa.dtype == np.float64
 
     def test_values_preserved_after_dtype_conversion(self, lcl_eq):
@@ -156,14 +165,15 @@ class TestDtypeConversion:
             np.array([285.15], dtype=np.float32),
             np.array([1013.25], dtype=np.float32),
         )
-        assert abs(float(temp_k[0])      - 293.15) < 1e-3
-        assert abs(float(dewpoint_k[0])  - 285.15) < 1e-3
-        assert abs(float(pressure_hpa[0])- 1013.25) < 1e-2
+        assert abs(float(temp_k[0]) - 293.15) < 1e-3
+        assert abs(float(dewpoint_k[0]) - 285.15) < 1e-3
+        assert abs(float(pressure_hpa[0]) - 1013.25) < 1e-2
 
 
 # ===========================================================================
 # Section 3 — shape broadcasting
 # ===========================================================================
+
 
 class TestShapeBroadcasting:
     """Outputs must be broadcast to a consistent common shape."""
@@ -175,18 +185,16 @@ class TestShapeBroadcasting:
         )
         # After broadcast_arrays, scalars become 0-d arrays
         # then ascontiguousarray keeps them 1-d or 0-d
-        assert temp_k.ndim      >= 0
-        assert dewpoint_k.ndim  >= 0
+        assert temp_k.ndim >= 0
+        assert dewpoint_k.ndim >= 0
         assert pressure_hpa.ndim >= 0
 
     def test_array_scalar_scalar_broadcasts(self, lcl_eq):
         """Array + scalar + scalar → all outputs match array shape."""
         arr = np.array([293.15, 303.15, 283.15])
-        temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
-            lcl_eq, arr, 285.15, 1013.25
-        )
-        assert temp_k.shape      == (3,)
-        assert dewpoint_k.shape  == (3,)
+        temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(lcl_eq, arr, 285.15, 1013.25)
+        assert temp_k.shape == (3,)
+        assert dewpoint_k.shape == (3,)
         assert pressure_hpa.shape == (3,)
 
     def test_all_same_shape_arrays(self, lcl_eq):
@@ -198,18 +206,16 @@ class TestShapeBroadcasting:
             np.full(n, 285.15),
             np.full(n, 1013.25),
         )
-        assert temp_k.shape      == (n,)
-        assert dewpoint_k.shape  == (n,)
+        assert temp_k.shape == (n,)
+        assert dewpoint_k.shape == (n,)
         assert pressure_hpa.shape == (n,)
 
     def test_scalar_scalar_array_broadcasts(self, lcl_eq):
         """Scalar + scalar + array → all outputs match array shape."""
         arr = np.array([1013.25, 1000.0, 850.0])
-        temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
-            lcl_eq, 293.15, 285.15, arr
-        )
-        assert temp_k.shape      == (3,)
-        assert dewpoint_k.shape  == (3,)
+        temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(lcl_eq, 293.15, 285.15, arr)
+        assert temp_k.shape == (3,)
+        assert dewpoint_k.shape == (3,)
         assert pressure_hpa.shape == (3,)
 
     def test_large_array_shape_preserved(self, lcl_eq):
@@ -222,8 +228,8 @@ class TestShapeBroadcasting:
             rng.uniform(270.0, 290.0, n),
             rng.uniform(850.0, 1013.25, n),
         )
-        assert temp_k.shape      == (n,)
-        assert dewpoint_k.shape  == (n,)
+        assert temp_k.shape == (n,)
+        assert dewpoint_k.shape == (n,)
         assert pressure_hpa.shape == (n,)
 
     def test_incompatible_shapes_raise(self, lcl_eq):
@@ -231,7 +237,7 @@ class TestShapeBroadcasting:
         with pytest.raises(ValueError):
             _broadcast(
                 lcl_eq,
-                np.array([293.15, 303.15]),    # shape (2,)
+                np.array([293.15, 303.15]),  # shape (2,)
                 np.array([285.15, 298.15, 278.15]),  # shape (3,) — incompatible
                 1013.25,
             )
@@ -245,14 +251,15 @@ class TestShapeBroadcasting:
             np.full(shape, 285.15),
             np.full(shape, 1013.25),
         )
-        assert temp_k.shape      == shape
-        assert dewpoint_k.shape  == shape
+        assert temp_k.shape == shape
+        assert dewpoint_k.shape == shape
         assert pressure_hpa.shape == shape
 
 
 # ===========================================================================
 # Section 4 — contiguous memory layout
 # ===========================================================================
+
 
 class TestContiguousMemory:
     """
@@ -266,8 +273,8 @@ class TestContiguousMemory:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq, 293.15, 285.15, 1013.25
         )
-        assert temp_k.flags["C_CONTIGUOUS"],       "temp_k not C-contiguous"
-        assert dewpoint_k.flags["C_CONTIGUOUS"],   "dewpoint_k not C-contiguous"
+        assert temp_k.flags["C_CONTIGUOUS"], "temp_k not C-contiguous"
+        assert dewpoint_k.flags["C_CONTIGUOUS"], "dewpoint_k not C-contiguous"
         assert pressure_hpa.flags["C_CONTIGUOUS"], "pressure_hpa not C-contiguous"
 
     def test_array_inputs_contiguous(self, lcl_eq):
@@ -290,8 +297,8 @@ class TestContiguousMemory:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq,
             np.array([293.15, 303.15, 283.15]),
-            285.15,    # scalar → broadcast view, stride=0
-            1013.25,   # scalar → broadcast view, stride=0
+            285.15,  # scalar → broadcast view, stride=0
+            1013.25,  # scalar → broadcast view, stride=0
         )
         assert dewpoint_k.flags["C_CONTIGUOUS"], (
             "Broadcast scalar (stride=0 view) was not made contiguous"
@@ -307,8 +314,8 @@ class TestContiguousMemory:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq,
             rng.uniform(280.0, 310.0, n),
-            285.15,     # scalar broadcast
-            1013.25,    # scalar broadcast
+            285.15,  # scalar broadcast
+            1013.25,  # scalar broadcast
         )
         assert temp_k.flags["C_CONTIGUOUS"]
         assert dewpoint_k.flags["C_CONTIGUOUS"]
@@ -319,6 +326,7 @@ class TestContiguousMemory:
 # Section 5 — return types
 # ===========================================================================
 
+
 class TestReturnTypes:
     """Outputs must always be numpy ndarrays of float64."""
 
@@ -327,10 +335,10 @@ class TestReturnTypes:
         temp_k, dewpoint_k, pressure_hpa, was_scalar = _broadcast(
             lcl_eq, 293.15, 285.15, 1013.25
         )
-        assert isinstance(temp_k,       np.ndarray)
-        assert isinstance(dewpoint_k,   np.ndarray)
+        assert isinstance(temp_k, np.ndarray)
+        assert isinstance(dewpoint_k, np.ndarray)
         assert isinstance(pressure_hpa, np.ndarray)
-        assert isinstance(was_scalar,   bool)
+        assert isinstance(was_scalar, bool)
 
     def test_was_scalar_is_python_bool(self, lcl_eq):
         """was_scalar must be a Python bool, not numpy bool."""
@@ -350,17 +358,18 @@ class TestReturnTypes:
             np.array([285.15, 298.15]),
             np.array([1013.25, 1000.0]),
         )
-        assert isinstance(temp_k,       np.ndarray)
-        assert isinstance(dewpoint_k,   np.ndarray)
+        assert isinstance(temp_k, np.ndarray)
+        assert isinstance(dewpoint_k, np.ndarray)
         assert isinstance(pressure_hpa, np.ndarray)
-        assert temp_k.dtype      == np.float64
-        assert dewpoint_k.dtype  == np.float64
+        assert temp_k.dtype == np.float64
+        assert dewpoint_k.dtype == np.float64
         assert pressure_hpa.dtype == np.float64
 
 
 # ===========================================================================
 # Section 6 — value preservation
 # ===========================================================================
+
 
 class TestValuePreservation:
     """Broadcasting and conversion must not alter input values."""
@@ -370,20 +379,20 @@ class TestValuePreservation:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq, 293.15, 285.15, 1013.25
         )
-        assert float(temp_k.flat[0])       == 293.15
-        assert float(dewpoint_k.flat[0])   == 285.15
+        assert float(temp_k.flat[0]) == 293.15
+        assert float(dewpoint_k.flat[0]) == 285.15
         assert float(pressure_hpa.flat[0]) == 1013.25
 
     def test_array_values_preserved(self, lcl_eq):
         """Array values must be exactly preserved after broadcasting."""
-        t_in  = np.array([293.15, 303.15, 283.15])
+        t_in = np.array([293.15, 303.15, 283.15])
         td_in = np.array([285.15, 298.15, 278.15])
-        p_in  = np.array([1013.25, 1000.0, 850.0])
+        p_in = np.array([1013.25, 1000.0, 850.0])
 
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(lcl_eq, t_in, td_in, p_in)
 
-        np.testing.assert_array_equal(temp_k,       t_in)
-        np.testing.assert_array_equal(dewpoint_k,   td_in)
+        np.testing.assert_array_equal(temp_k, t_in)
+        np.testing.assert_array_equal(dewpoint_k, td_in)
         np.testing.assert_array_equal(pressure_hpa, p_in)
 
     def test_broadcast_scalar_fills_correctly(self, lcl_eq):
@@ -392,10 +401,10 @@ class TestValuePreservation:
         temp_k, dewpoint_k, pressure_hpa, _ = _broadcast(
             lcl_eq,
             np.full(n, 293.15),
-            285.15,     # scalar — should fill all 5 elements
-            1013.25,    # scalar — should fill all 5 elements
+            285.15,  # scalar — should fill all 5 elements
+            1013.25,  # scalar — should fill all 5 elements
         )
-        np.testing.assert_array_equal(dewpoint_k,   np.full(n, 285.15))
+        np.testing.assert_array_equal(dewpoint_k, np.full(n, 285.15))
         np.testing.assert_array_equal(pressure_hpa, np.full(n, 1013.25))
 
     def test_list_values_preserved(self, lcl_eq):
@@ -406,8 +415,8 @@ class TestValuePreservation:
             [285.15, 298.15],
             [1013.25, 1000.0],
         )
-        np.testing.assert_array_almost_equal(temp_k,       [293.15, 303.15])
-        np.testing.assert_array_almost_equal(dewpoint_k,   [285.15, 298.15])
+        np.testing.assert_array_almost_equal(temp_k, [293.15, 303.15])
+        np.testing.assert_array_almost_equal(dewpoint_k, [285.15, 298.15])
         np.testing.assert_array_almost_equal(pressure_hpa, [1013.25, 1000.0])
 
 
@@ -415,31 +424,46 @@ class TestValuePreservation:
 # Section 7 — mixed input types
 # ===========================================================================
 
+
 class TestMixedInputTypes:
     """All common input type combinations must work correctly."""
 
-    @pytest.mark.parametrize("temp_k,dewpoint_k,pressure_hpa,expected_scalar", [
-        (293.15,                  285.15,                  1013.25,                True),   # all float
-        (293,                     285,                     1013,                   True),   # all int
-        (np.float64(293.15),      np.float64(285.15),      np.float64(1013.25),   True),   # all np scalar
-        (np.array([293.15]),      285.15,                  1013.25,               False),  # one array
-        ([293.15],                [285.15],                [1013.25],             False),  # all lists
-        (np.array([293.15, 303.15]), np.array([285.15, 298.15]), 1013.25,        False),  # arrays + scalar
-    ])
+    @pytest.mark.parametrize(
+        "temp_k,dewpoint_k,pressure_hpa,expected_scalar",
+        [
+            (293.15, 285.15, 1013.25, True),  # all float
+            (293, 285, 1013, True),  # all int
+            (
+                np.float64(293.15),
+                np.float64(285.15),
+                np.float64(1013.25),
+                True,
+            ),  # all np scalar
+            (np.array([293.15]), 285.15, 1013.25, False),  # one array
+            ([293.15], [285.15], [1013.25], False),  # all lists
+            (
+                np.array([293.15, 303.15]),
+                np.array([285.15, 298.15]),
+                1013.25,
+                False,
+            ),  # arrays + scalar
+        ],
+    )
     def test_input_type_combinations(
         self, lcl_eq, temp_k, dewpoint_k, pressure_hpa, expected_scalar
     ):
         """All type combinations must produce correct was_scalar flag."""
         t, td, p, was_scalar = _broadcast(lcl_eq, temp_k, dewpoint_k, pressure_hpa)
         assert was_scalar == expected_scalar
-        assert t.dtype   == np.float64
-        assert td.dtype  == np.float64
-        assert p.dtype   == np.float64
+        assert t.dtype == np.float64
+        assert td.dtype == np.float64
+        assert p.dtype == np.float64
 
 
 # ===========================================================================
 # Section 8 — edge cases
 # ===========================================================================
+
 
 class TestEdgeCases:
     """Boundary and unusual inputs."""
@@ -457,12 +481,12 @@ class TestEdgeCases:
             lcl_eq, 293.15, 293.15, 1013.25
         )
         assert was_scalar is True
-        assert float(temp_k.flat[0])     == 293.15
+        assert float(temp_k.flat[0]) == 293.15
         assert float(dewpoint_k.flat[0]) == 293.15
 
     def test_very_large_array(self, lcl_eq):
         """1M element arrays must broadcast and be contiguous."""
-        n   = 1_000_000
+        n = 1_000_000
         rng = np.random.default_rng(42)
         t, td, p, was_scalar = _broadcast(
             lcl_eq,
@@ -471,9 +495,9 @@ class TestEdgeCases:
             rng.uniform(850.0, 1013.25, n),
         )
         assert was_scalar is False
-        assert t.shape  == (n,)
+        assert t.shape == (n,)
         assert t.flags["C_CONTIGUOUS"]
-        assert t.dtype  == np.float64
+        assert t.dtype == np.float64
 
     def test_tuple_input(self, lcl_eq):
         """Tuple inputs should behave identically to lists."""
@@ -500,7 +524,7 @@ class TestEdgeCases:
             1013.25,
         )
         original_td = td.copy()
-        t[0] = 999.99   # modify temp_k
+        t[0] = 999.99  # modify temp_k
         np.testing.assert_array_equal(td, original_td)  # dewpoint_k unchanged
 
 

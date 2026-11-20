@@ -833,5 +833,6 @@ class TestAccuracyAgainstMetPy:
         ref = mp_theta(p * mp_units.hPa, t * mp_units.K).to("K").magnitude
         np.testing.assert_allclose(ours, ref, rtol=RTOL_DRY_VS_METPY, atol=0.0)
 
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

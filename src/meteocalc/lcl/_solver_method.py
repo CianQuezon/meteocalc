@@ -174,6 +174,14 @@ def get_lcl_using_solver(
     return roots, iters, converged
 
 
+# Compiled objective functions, keyed by vapor equation class. The objective
+# embeds both the ice and water constants and selects between them at run time,
+# so the surface type does not change the compiled function. A fresh ``@njit``
+# closure is a new Numba type, so building one per call forces the root solver
+# to recompile every time. Build once and reuse.
+_OBJECTIVE_CACHE: dict = {}
+
+
 def _get_lcl_objective_function(vapor_equation: VaporEquation):
     """
     Build a JIT-compiled LCL objective function for a given vapour equation.
@@ -198,6 +206,10 @@ def _get_lcl_objective_function(vapor_equation: VaporEquation):
         Numba ``@njit`` scalar function with signature:
         ``(x, mixing_ratio, surface_pressure, surface_temp) -> float``
     """
+    cache_key = type(vapor_equation)
+    cached_objective = _OBJECTIVE_CACHE.get(cache_key)
+    if cached_objective is not None:
+        return cached_objective
     no_constants = False
 
     vapor_scalar_func = vapor_equation.get_jit_scalar_func()
@@ -261,4 +273,5 @@ def _get_lcl_objective_function(vapor_equation: VaporEquation):
 
         return rs - mixing_ratio
 
+    _OBJECTIVE_CACHE[cache_key] = lcl_objective
     return lcl_objective
